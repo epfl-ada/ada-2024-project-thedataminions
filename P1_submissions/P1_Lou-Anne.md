@@ -1,4 +1,6 @@
 IDEA N°1:
+
+
 →The title of this project will be: "Viewer Errors in Channel Names - Discovery of New
 Channels". Each channel has a name (stored as 'name_cc' in df_channels_en.tsv.gz). Some
 channels share common parts in their names, such as "Thunder Play", "Thunder Prod", and
@@ -11,7 +13,11 @@ new channels to name after famous ones? Will it increase views and visibility? T
 aim is to identify viewer errors: instances where viewers intend to watch videos from a
 specific growing channel, but inadvertently watch videos from another channel with a similar
 name.
+
+
 IDEA N°2:
+
+
 → The title will be : “American presidential election from 2005 to 2019 : does the result of the
 election follow youtube data?”. The main goal of this project is to analyze the past
 presidential elections winners and see if there is a relation to the numbers of
@@ -29,7 +35,11 @@ more votes for him?). Our data analysis could be compared to the real result tha
 to show if it’s working or not. It could even be a tool to predict the next election !
 This could also be done for other elections, not only for Americans elections, and we could
 compare the different craze of people around elections, depending on their nationality.
+
+
 IDEA N°3:
+
+
 The title will be ‘A secret to fame’. The goal of this data analysis will be to explore the
 different patterns Youtube superstar took. Classing the Youtube star by categories of videos
 (categories_cc in df_channels_en.tsv.gz) and then take the top 10 superstar of each
