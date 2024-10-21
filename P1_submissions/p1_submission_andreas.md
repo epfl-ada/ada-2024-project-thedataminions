@@ -13,3 +13,6 @@ Video description may contain links connected to ad campaigns, links to a patreo
  what is most frequently the content of such videos? A guess could be that these are independent political influencers/self-proclaimed journalists and similar. Similarly, which category of videos most frequently uses ads in the description? These analyses could
  be performed by comparing e.g. the set of all videos with ads to other, defined sets of videos, such as the set of videos related to music, based on different criteria (YouTube category, keywords in the description etc.). It could also be possible to further
  analyze the resulting sets in other regards, such as the mean subscriber count or weekly views of videos in the set.
+
+# Assistant feedback
+TA/SA:Shawn, Shuangqi/Matea \\ email: shuyang.fan@epfl.ch, shuangqi.li@epfl.ch\\ Feedback: Interesting ideas with great explanations, well done! I especially like the frst idea and how you define the bubbles and I think it could lead to some very interesting insights. Just as an advice - make the idea to be more specific. For example, you could define more clearly from which spheres do you want to find bubbles (as you mentioned politics, sports etc.) and what kind of analysis you want to do between them in order to tell an interesting story.
