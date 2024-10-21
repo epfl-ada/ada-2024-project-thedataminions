@@ -50,3 +50,7 @@ to ask our interactive site what category he/she wants to make videos about, and
 to-do list on the best way to post, how much time, what keywords to put in the description,
 and even how much money he/she can expect to make in a given amount of time (taken into
 account that every youtubers that make a certain number of views
+
+
+
+Assistant feedback : Feedback: All ideas are creative and good in general, but some points are not clear enough. The text is not clearly written and sometimes it is hard to understand what you want to achieve. Also, make sure not to make assumptions that are not supported by the data. For example, in the first idea, how would you ensure that the increase in views is a result of viewer confusion rather than the quality of the content? For the third idea, I am not sure if the given suggestions will be most accurate if they are based only on the category of the channel. You should think about other factors that could influence the success.
