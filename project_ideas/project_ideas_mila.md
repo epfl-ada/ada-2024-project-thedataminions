@@ -16,7 +16,6 @@ Andreas idea 2: loyal fans
 
 -> nice ideas/stats to add to Lams#3
 
--------------------------------------------
 ## Youtube evolution vs. society evolution
 Horti idea 3 : How did YouTube grow over the years ? 
 Project name is a bit broad/not specific enough but ideas inside are cool !!
@@ -31,7 +30,6 @@ YouTube channels still active in 2019, are they “famous” or just in the shad
 Merge with :
 Mila idea 2: compare videos uploads to major events 
 
-------------------------------------------
 # Easier / more straightforward project ideas (less chances to get lost in the datas and analysis)
 
 Andreas idea 3: links
