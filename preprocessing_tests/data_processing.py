@@ -4,7 +4,7 @@ import pandas as pd
 from typing import Tuple
 
 
-def run_simple_function_on_chunks(reader, fct, print_time: bool | dict = False) -> pd.DataFrame:
+def run_simple_function_on_chunks(reader, fct, print_time: bool | Tuple = False) -> pd.DataFrame:
     """
     Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
     The function returns a single dataframe with the results from all chunks concatenated.
