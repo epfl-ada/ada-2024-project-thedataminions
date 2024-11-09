@@ -1,6 +1,7 @@
 """Functions for processing (big) datasets. Will be called from the notebook"""
 import time
 import pandas as pd
+from typing import Tuple
 
 
 def run_simple_function_on_chunks(reader, fct, print_time: bool | dict = False) -> pd.DataFrame:
@@ -98,3 +99,44 @@ def get_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) 
             return data[data.notna()[col]]
         
 
+def count_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
+    """
+    Goes through a dataframe to count the rows with na elements (using pd.isna).
+    Can be specified to either count rows where any entry is na, 
+    or rows where a specified column is na, or where all columns are na.
+    
+    Args:
+        data: the dataframe to be filtered
+        col: string defining the criterion. 
+            'any' (default) counts rows where any entry is na. 
+            '<col_name>' counts rows where entries in the column <col_name> are na.
+            'all' counts rows where all entries are na.
+        reverse: if True, instead counts the complement of the filtered dataframe, i.e., 
+            all rows that do not have na entries (in any, all or a specific column, as defined by 'col')
+            
+    Returns:
+        Dataframe with one row, two columns, first is the count of na rows (or not-na rows when reverse=True),
+        the second is the total count of rows in the given dataframe
+    """
+
+    if col == "any":
+        if not reverse:
+            return pd.DataFrame({"na rows": len(data[data.isna().any(axis=1)]), 
+                                 "total rows": len(data)}, index=[0])
+        else:
+            return pd.DataFrame({"non-na rows": len(data[data.notna().all(axis=1)]), 
+                                 "total rows": len(data)}, index=[0])
+    elif col == "all":
+        if not reverse:
+            return pd.DataFrame({"na rows": len(data[data.isna().all(axis=1)]), 
+                                 "total rows": len(data)}, index=[0])
+        else:
+            return pd.DataFrame({"non-na rows": len(data[data.notna().any(axis=1)]), 
+                                 "total rows": len(data)}, index=[0])
+    else:
+        if not reverse:
+            return pd.DataFrame({"na rows": len(data[data.isna()[col]]), 
+                                 "total rows": len(data)}, index=[0])
+        else:
+            return pd.DataFrame({"non-na rows": len(data[data.notna()[col]]), 
+                                 "total rows": len(data)}, index=[0])
