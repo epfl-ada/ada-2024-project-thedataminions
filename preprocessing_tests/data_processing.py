@@ -52,6 +52,8 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
 
 def run_simple_function_on_chunks_sum(reader, fct, sum_by_column: str, print_time: bool | Tuple = False) -> pd.DataFrame:
     """
+    DON'T USE YET, DOESN'T WORK!!
+
     Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
     The function returns a single dataframe with the results from all chunks summed, 
     i.e., if in two chunks similar entries are found, a single row is created with the values summed.
@@ -94,21 +96,6 @@ def run_simple_function_on_chunks_sum(reader, fct, sum_by_column: str, print_tim
 
 
             return result
-
-
-def filter_comments_by_author(data: pd.DataFrame, author: int) -> pd.DataFrame:
-    """
-    Filters a given dataframe so that only entries corresponding to the given author remains.
-    
-    Args:
-        data: the dataframe to be filtered
-        author: the id of the author to be filtered by
-        
-    Returns:
-        The filtered dataframe
-    """
-
-    return data.loc[data.author == author]
 
 
 def get_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
@@ -189,5 +176,3 @@ def count_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False
                                  "total rows": len(data)}, index=[0])
         
 
-def get_viewcount_per_channel(data: pd.DataFrame) -> pd.DataFrame:
-    """"""
