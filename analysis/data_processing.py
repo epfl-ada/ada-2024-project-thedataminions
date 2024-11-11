@@ -1,10 +1,13 @@
 """Functions for processing (big) datasets. Will be called from the notebook"""
 import time
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, Optional
 
 
-def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False) -> pd.DataFrame:
+def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
+                                         save: Optional[str] = None, 
+                                         save_every: Optional[int] = None,
+                                         compress: str = "") -> pd.DataFrame:
     """
     Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
     The function returns a single dataframe with the results from all chunks concatenated.
@@ -15,14 +18,35 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             If a tuple with two entries is given, where the fist is the chunk size used in the reader, 
             and the second is the total number of entries in the dataset,
             then additional data about estimated time left is printed.
+        save: If a string (must be a valid path, WITHOUT .csv at the end!") is given here, the concatenated df is saved here.
+        save_every: If a positive integer is given here, the concatenated df will be saved every <save_every> chunk. This
+            is so that the resulting df does not become too big.
+        compress: If a string is passed here, it will be appended to the filename and the compression would be inferred from that
+            example: pass '.gz' 
     """
     
     with reader:
         
         result = pd.DataFrame()
         if not print_time:
+            i = 0
             for chunk in reader:
                 result = pd.concat([result, fct(chunk)])
+                if not not save_every:
+                    if (i+1) % save_every == 0:
+                        result.to_csv(save +  f"__{i + 1 - save_every}_{i}.csv" + compress)  # save the df concatenated so far
+                        result = pd.DataFrame()  # clear the df to avoid memory becoming too big
+                        print(f"saved data under {save}__{i + 1 -save_every}_{i}.csv" + compress)
+                        collector = gc.collect()
+                        print(f"Collected {collector} garbages.")
+
+            if not not save and not save_every:
+                result.to_csv(save + ".csv" + compress)
+                print(f"saved data under {save}.csv" + compress)
+            elif not not save_every:
+                result.to_csv(save + f"__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)  # save the remaining data (if the number of chunks is not a multiple of save_every)
+                print(f"saved data under {save}__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)
+
             return result
         
         elif print_time is True:
@@ -30,8 +54,24 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             for i, chunk in enumerate(reader):
                 print(f"Going through chunk {i}...")
                 result = pd.concat([result, fct(chunk)])
+                if not not save_every:
+                    if (i+1) % save_every == 0:
+                        result.to_csv(save +  f"__{i + 1 - save_every}_{i}.csv" + compress)  # save the df concatenated so far
+                        result = pd.DataFrame()  # clear the df to avoid memory becoming too big
+                        print(f"saved data under {save}__{i + 1 -save_every}_{i}.csv" + compress)
+                        collector = gc.collect()
+                        print(f"Collected {collector} garbages.")
                 time_end = time.time()
                 print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
+            
+            if not not save and not save_every:
+                result.to_csv(save + ".csv" + compress)
+                print(f"saved data under {save}.csv" + compress)
+            elif not not save_every:
+                result.to_csv(save + f"__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)  # save the remaining data (if the number of chunks is not a multiple of save_every)
+                print(f"saved data under {save}__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)
+
+
             return result
         
         else:
@@ -39,6 +79,14 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             for i, chunk in enumerate(reader):
                 print(f"Going through chunk {i}...")
                 result = pd.concat([result, fct(chunk)])
+                if not not save_every:
+                    if (i+1) % save_every == 0:
+                        result.to_csv(save +  f"__{i + 1 - save_every}_{i}.csv" + compress)  # save the df concatenated so far
+                        result = pd.DataFrame()  # clear the df to avoid memory becoming too big
+                        print(f"saved data under {save}__{i + 1-save_every}_{i}.csv" + compress)
+                        collector = gc.collect()
+                        print(f"Collected {collector} garbages.")
+                
                 time_end = time.time()
                 processed_entries = (i+1)*print_time[0]
                 entries_left = print_time[1] - processed_entries
@@ -46,6 +94,12 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
                 print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
                 print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.")
 
+            if not not save and not save_every:
+                result.to_csv(save + ".csv" + compress)
+                print(f"saved data under {save}.csv" + compress)
+            elif not not save_every:
+                result.to_csv(save + f"__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)  # save the remaining data (if the number of chunks is not a multiple of save_every)
+                print(f"saved data under {save}__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)
 
             return result
 
