@@ -299,6 +299,77 @@ def get_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) 
         else:
             return data[data.notna()[col]]
         
+def get_empty_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
+    """
+    Filters a dataframe to return only rows with empty elements (using specific condition).
+    Can be specified to either return rows where any entry is empty, or rows where a specified column is empty, or where all columns are empty.
+    
+    Args:
+        data: the dataframe to be filtered
+        col: string defining the criterion. 
+            'any' (default) returns rows where any entry is empty. 
+            '<col_name>' returns rows where entries in the column <col_name> are empty.
+            'all' returns rows where all entries are empty.
+        reverse: if True, instead returns the complement of the filtered dataframe, i.e., 
+            all rows that do not have na entries (in any, all or a specific column, as defined by 'col')
+            
+    Returns:
+        the filtered dataframe
+    """
+    # Check for empty strings ('' or ' ') by using .str.strip() to remove spaces
+    empty_check = data.applymap(lambda x: str(x).strip() == '')
+    if col == "any":
+        if not reverse:
+            return data[empty_check.any(axis=1)]
+        else:
+            return data[~empty_check.any(axis=1)]
+    elif col == "all":
+        if not reverse:
+            return data[empty_check.all(axis=1)]
+        else:
+            return data[~empty_check.all(axis=1)]
+    else:
+        if not reverse:
+            return data[empty_check[col]]
+        else:
+            return data[~empty_check[col]]
+    
+def get_space_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
+    """
+    Filters a dataframe to return only rows with space elements (using specific condition).
+    Can be specified to either return rows where any entry is a space, or rows where a specified column is a space, or where all columns are composed of space.
+    
+    Args:
+        data: the dataframe to be filtered
+        col: string defining the criterion. 
+            'any' (default) returns rows where any entry is empty. 
+            '<col_name>' returns rows where entries in the column <col_name> are empty.
+            'all' returns rows where all entries are empty.
+        reverse: if True, instead returns the complement of the filtered dataframe, i.e., 
+            all rows that do not have na entries (in any, all or a specific column, as defined by 'col')
+            
+    Returns:
+        the filtered dataframe
+    """
+    # Check for empty strings ('' or ' ') by using .str.strip() to remove spaces
+    space_check = data.applymap(lambda x: str(x).strip() == ' ')
+    if col == "any":
+        if not reverse:
+            return data[space_check.any(axis=1)]
+        else:
+            return data[~space_check.any(axis=1)]
+    elif col == "all":
+        if not reverse:
+            return data[space_check.all(axis=1)]
+        else:
+            return data[~space_check.all(axis=1)]
+    else:
+        if not reverse:
+            return data[space_check[col]]
+        else:
+            return data[~space_check[col]]
+
+        
 
 def count_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
     """
