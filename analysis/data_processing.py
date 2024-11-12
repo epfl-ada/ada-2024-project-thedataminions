@@ -2,6 +2,7 @@
 import time
 import pandas as pd
 from typing import Tuple, Optional
+import gc
 
 
 def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
@@ -39,6 +40,7 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
                         print(f"saved data under {save}__{i + 1 -save_every}_{i}.csv" + compress)
                         collector = gc.collect()
                         print(f"Collected {collector} garbages.")
+                    
 
             if not not save and not save_every:
                 result.to_csv(save + ".csv" + compress)
@@ -103,6 +105,72 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
 
             return result
 
+
+def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, 
+                                           print_time: bool | Tuple = False):
+    """
+    Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
+    The function returns nothing, but saves the results into a single csv.
+
+    Args:
+        reader: iterator object that returns the chunks, you can get it for example by calling pd.read_csv(...., chunksize=something).
+        filename: file path and name, including the ending .csv, and optionally an ending for compression (such as .gz)
+        print_time: If False (default), does not print time data. If True, prints the average time per chunk.
+            If a tuple with two entries is given, where the fist is the chunk size used in the reader, 
+            and the second is the total number of entries in the dataset,
+            then additional data about estimated time left is printed.
+        
+    """
+    
+    with reader:
+        
+        # result = pd.DataFrame()
+        if not print_time:
+            i = 0
+            header = True  # when writing to the csv the first time, include header
+            for chunk in reader:
+                # result = pd.concat([result, fct(chunk)])
+                result = fct(chunk)
+                result.to_csv(filename, header=header, mode='a')
+                header = False  # when appending new rows to the csv, don't include header
+                del result
+                gc.collect()
+            return result
+        
+        elif print_time is True:
+            time_start_global = time.time()
+            header = True
+            for i, chunk in enumerate(reader):
+                print(f"Going through chunk {i}...")
+                result = fct(chunk)
+                result.to_csv(filename, header=header, mode='a')
+                header = False  # when appending new rows to the csv, don't include header
+                del result
+                gc.collect()
+                time_end = time.time()
+                print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
+            return result
+        
+        else:
+            time_start_global = time.time()
+            header = True
+            for i, chunk in enumerate(reader):
+                print(f"Going through chunk {i}...")
+                result = fct(chunk)
+                time_save_start = time.time()
+                result.to_csv(filename, header=header, mode='a')
+                time_save_end = time.time()
+                print(f"time spent saving: {time_save_end-time_save_start} secs")
+                header = False  # when appending new rows to the csv, don't include header
+                del result
+                gc.collect()
+                time_end = time.time()
+                processed_entries = (i+1)*print_time[0]
+                entries_left = print_time[1] - processed_entries
+                avg_time_per_chunk = (time_end-time_start_global)/(i+1)
+                print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
+                print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.")
+            return result
 
 def run_simple_function_on_chunks_sum(reader, fct, sum_by_column: str, print_time: bool | Tuple = False) -> pd.DataFrame:
     """
