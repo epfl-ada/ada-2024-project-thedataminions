@@ -3,7 +3,7 @@ import time
 import pandas as pd
 from typing import Tuple, Optional
 import gc
-
+import os
 
 def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
                                          save: Optional[str] = None, 
@@ -106,7 +106,9 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             return result
 
 
-def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: int = 1,
+def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, 
+                                           index: bool, index_label = None,
+                                           every: int = 1, overwrite: bool = False,
                                            print_time: bool | Tuple = False):
     """
     Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
@@ -115,6 +117,11 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
     Args:
         reader: iterator object that returns the chunks, you can get it for example by calling pd.read_csv(...., chunksize=something).
         filename: file path and name, including the ending .csv, and optionally an ending for compression (such as .gz)
+        index: bool, will be passed directly to the to_csv function. If True, also saves the index.
+        index_label: can be string, list of strings, False or None (default). Is passed directly to the to_csv function.
+            If False, doesn't save a label for the index column. If None, uses the index name from the df. Otherwise, 
+            uses the given string. (Sequence is only used for multi index)
+        overwrite: if True (default is False), will overwrite existing file. Otherwise raises error.
         every: will save every <every> chunks. Default is 1 (saves after every chunk)
         print_time: If False (default), does not print time data. If True, prints the average time per chunk.
             If a tuple with two entries is given, where the fist is the chunk size used in the reader, 
@@ -122,6 +129,12 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
             then additional data about estimated time left is printed.
         
     """
+    if os.path.isfile(filename) and overwrite is not True:
+        raise ValueError("the given file already exists.\n" + 
+                         "This function will not overwrite files for data safety reasons, unless overwrite=True is passed.")
+    elif os.path.isfile(filename) and overwrite is True:
+        os.remove(filename)
+        print("Removed the existing file, because overwrite=True was passed.")
     
     with reader:
         
@@ -132,7 +145,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
             for i, chunk in enumerate(reader):
                 result = pd.concat([result, fct(chunk)])
                 if (i + 1) % every == 0:
-                    result.to_csv(filename, header=header, mode='a')
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                     header = False  # when appending new rows to the csv, don't include header
                     print("Appended new rows to the csv file")
                     del result
@@ -140,7 +153,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
                     result = pd.DataFrame()
             
             if not result.empty:  # if there is something left to apppend to the csv, do that now
-                result.to_csv(filename, header=header, mode='a')
+                result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                 print("Appended last rows to the csv file")
             return
         
@@ -153,7 +166,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
                 result = pd.concat([result, fct(chunk)])
                 if (i+1) % every == 0:
                     time_save_start = time.time()
-                    result.to_csv(filename, header=header, mode='a')
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                     time_save_end = time.time()
                     print("Appended new rows to the csv file")
                     print(f"Time spent saving: {time_save_end - time_save_start} secs")
@@ -166,7 +179,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
 
             if not result.empty:  # if there is something left to apppend to the csv, do that now
                 time_save_start = time.time()
-                result.to_csv(filename, header=header, mode='a')
+                result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                 time_save_end = time.time()
                 print("Appended last rows to the csv file")                   
                 print(f"Time spent saving: {time_save_end-time_save_start} secs")
@@ -181,7 +194,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
                 result = pd.concat([result,fct(chunk)])
                 if (i+1) % every == 0:
                     time_save_start = time.time()
-                    result.to_csv(filename, header=header, mode='a')
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                     time_save_end = time.time()
                     print("Appended new rows to the csv file")                   
                     print(f"Time spent saving: {time_save_end-time_save_start} secs\n")
@@ -198,7 +211,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, every: in
 
             if not result.empty:  # if there is something left to apppend to the csv, do that now
                 time_save_start = time.time()
-                result.to_csv(filename, header=header, mode='a')
+                result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                 time_save_end = time.time()
                 print("Appended last rows to the csv file")                   
                 print(f"Time spent saving: {time_save_end-time_save_start} secs")
