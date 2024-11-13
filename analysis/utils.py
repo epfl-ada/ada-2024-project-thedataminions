@@ -4,6 +4,7 @@ import pandas as pd
 from typing import Tuple, Optional
 import gc
 import os
+import numpy as np
 
 def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
                                          save: Optional[str] = None, 
@@ -412,5 +413,29 @@ def count_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False
         else:
             return pd.DataFrame({"non-na rows": len(data[data.notna()[col]]), 
                                  "total rows": len(data)}, index=[0])
+
+def clean (df, save):
+    """
+    Cleans a given df form empty and NaN values. Can be applied to a small df that we want to save in a clean version, as well as temporary chunks when reading a huge df.
+
+    Args:
+        df: df to clean
+        save: if True, activates the 'inplace' parameter of replace() and dropna(), meaning that the given df will be modified (use this when applying on chunks).
+              if False, the modified df has to be saved in a new parameter ! 
+
+    """
+    #check initial length of the chunk
+    #print(len(df))
+
+    if save==True:
+        # replace empty values with NaNs
+        df.replace('', np.nan, inplace = save)
+        # delete NaN columns
+        df.dropna(inplace= save)
+        #check final length of the chunk to see if NaN have been removed
+        #print(len(df))
+
+    if save==False:
+        return df.replace('', np.nan).dropna()
         
 
