@@ -82,7 +82,7 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             for i, chunk in enumerate(reader):
                 print(f"Going through chunk {i}...")
                 result = pd.concat([result, fct(chunk)])
-                if not not save_every:
+                if save_every:
                     if (i+1) % save_every == 0:
                         result.to_csv(save +  f"__{i + 1 - save_every}_{i}.csv" + compress)  # save the df concatenated so far
                         result = pd.DataFrame()  # clear the df to avoid memory becoming too big
@@ -97,10 +97,10 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
                 print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
                 print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.")
 
-            if not not save and not save_every:
+            if  not not save and not save_every:
                 result.to_csv(save + ".csv" + compress)
                 print(f"saved data under {save}.csv" + compress)
-            elif not not save_every:
+            elif  not not save_every:
                 result.to_csv(save + f"__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)  # save the remaining data (if the number of chunks is not a multiple of save_every)
                 print(f"saved data under {save}__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)
 
@@ -218,54 +218,6 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
                 print("Appended last rows to the csv file")                   
                 print(f"Time spent saving: {time_save_end-time_save_start} secs")
             return
-
-
-def run_simple_function_on_chunks_sum(reader, fct, sum_by_column: str, print_time: bool | Tuple = False) -> pd.DataFrame:
-    """
-    DON'T USE YET, DOESN'T WORK!!
-
-    Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
-    The function returns a single dataframe with the results from all chunks summed, 
-    i.e., if in two chunks similar entries are found, a single row is created with the values summed.
-
-    Args:
-        reader: iterator object that returns the chunks, you can get it for example by calling pd.read_csv(...., chunksize=something).
-        sum_by_column: specify the column where it is to be looked for similar entries.
-        print_time: If False (default), does not print time data. If True, prints the average time per chunk.
-            If a tuple with two entries is given, where the fist is the chunk size used in the reader, 
-            and the second is the total number of entries in the dataset,
-            then additional data about estimated time left is printed.
-    """
-    
-    with reader:
-        
-        result = pd.DataFrame()
-        if not print_time:
-            for chunk in reader:
-                result = pd.concat([result, fct(chunk)])
-            return result
-        elif print_time is True:
-            time_start_global = time.time()
-            for i, chunk in enumerate(reader):
-                print(f"Going through chunk {i}...")
-                result = pd.concat([result, fct(chunk)])
-                time_end = time.time()
-                print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
-            return result
-        else:
-            time_start_global = time.time()
-            for i, chunk in enumerate(reader):
-                print(f"Going through chunk {i}...")
-                result = pd.concat([result, fct(chunk)])
-                time_end = time.time()
-                processed_entries = (i+1)*print_time[0]
-                entries_left = print_time[1] - processed_entries
-                avg_time_per_chunk = (time_end-time_start_global)/(i+1)
-                print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
-                print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.")
-
-
-            return result
 
 
 def get_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
@@ -464,16 +416,14 @@ def clean (df, save):
               if False, the modified df has to be saved in a new parameter ! 
 
     """
-    #check initial length of the chunk
-    #print(len(df))
+   
 
     if save==True:
         # replace empty values with NaNs
         df.replace('', np.nan, inplace = save)
         # delete NaN columns
         df.dropna(inplace= save)
-        #check final length of the chunk to see if NaN have been removed
-        #print(len(df))
+       
 
     if save==False:
         return df.replace('', np.nan).dropna()
