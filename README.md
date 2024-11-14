@@ -24,16 +24,15 @@ In this study, we aim to analyze how users in News and Politics content tend to 
 
 ## Repository structure
 - 📁 `analysis`: 
-   - 📁 `psycache`:
-      - 
+   - 📁 `psycache`: ?
    - `analysis.ipynb`: Main notebook for Milestone 2.
    - `utils.py`: Utilities functions used in the notebooks.
 - :file_folder: `data`:
-  - `dataset`: 
-- `.gitignore`:
+  - `dataset`: The Youniverse dataset.
+- `.gitignore`: Specifies files and folders to ignore.
 - `README.md`: Main documentation file of the repository, providing an overview and general instructions.
-- `pip_requirements.txt`
-- `results.ipynb` 
+- `pip_requirements.txt`: List of packages required for our code.
+- `results.ipynb`: 
 
 ## Additional data
 To identify the leading news channels on Youtube, we are using following [article]( https://pressgazette.co.uk/media-audience-and-business-data/media_metrics/youtube-news-publishers-2023-gb-news-piers-morgan-cnn-fox/). We will focus on the TOP 5, excluding Vox (ranked 5th), as it was founded in 2014, which is not well representated in the timeframe of our data (2005-2019).
@@ -46,3 +45,11 @@ To identify the leading news channels on Youtube, we are using following [articl
 ### Part 4: Analyzing bubbles
 
 ## Proposed timeline & team organization
+|Timeframe | Tasks | Teammmates |
+|--------|--------------|-------|
+|Week 10 | <ol><li>Pairwise overlap algorithm</li><li>Bubbles analysis resp. random users</li>Degree of isolation</li></ol>| Mila, Lou-Anne, Andreas |
+|Week 11  | <ol><li>Bubbles identification</li><li>Plots for data visualization</li><li>Website familiarization and initiation</li></ol>| Manon, Hortense, Mila |
+|Week 12      | <ol><li>Bubbles analysis and closeness</li><ol>| Lou-Anne, Andreas |
+|Week 13      |<ol><li>Website development</li><li>Data story refining</li></ol>| Manon, Hortense |
+|Week 14  | <ol><li>Website refining</li><li>Code and readme cleaning</li></ol>| All |
+
