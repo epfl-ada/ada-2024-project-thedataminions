@@ -210,13 +210,15 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
                 print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
                 print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.\n")
 
-            if not result.empty:  # if there is something left to apppend to the csv, do that now
+            # if there is something left to apppend to the csv, do that now
+            if not result.empty:
                 time_save_start = time.time()
                 result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                 time_save_end = time.time()
                 print("Appended last rows to the csv file")                   
                 print(f"Time spent saving: {time_save_end-time_save_start} secs")
-            return 
+            return
+
 
 def run_simple_function_on_chunks_sum(reader, fct, sum_by_column: str, print_time: bool | Tuple = False) -> pd.DataFrame:
     """
@@ -317,8 +319,12 @@ def get_empty_entries(data: pd.DataFrame, col: str = "any", reverse: bool = Fals
     Returns:
         the filtered dataframe
     """
-    # Check for empty strings ('' or ' ') by using .str.strip() to remove spaces
-    empty_check = data.applymap(lambda x: str(x).strip() == '')
+    # # Check for empty strings ('' or ' ') by using .str.strip() to remove spaces
+    # empty_check = data.applymap(lambda x: str(x).strip() == '')
+    
+    # Check for empty strings ('')
+    empty_check = data.map(lambda x: str(x) == '')  # I removed the .strip() because I think it would return space rows as well otherwise
+
     if col == "any":
         if not reverse:
             return data[empty_check.any(axis=1)]
@@ -352,8 +358,12 @@ def get_space_entries(data: pd.DataFrame, col: str = "any", reverse: bool = Fals
     Returns:
         the filtered dataframe
     """
-    # Check for empty strings ('' or ' ') by using .str.strip() to remove spaces
-    space_check = data.applymap(lambda x: str(x).strip() == ' ')
+    # # Check for empty strings ('' or ' ') by using .str.strip() to remove spaces
+    # space_check = data.applymap(lambda x: str(x).strip() == ' ')
+
+    # Check for space strings (' ')
+    space_check = data.map(lambda x: str(x) == ' ')  # I removed the .strip() because I think it would never return anything otherwise
+
     if col == "any":
         if not reverse:
             return data[space_check.any(axis=1)]
@@ -370,7 +380,37 @@ def get_space_entries(data: pd.DataFrame, col: str = "any", reverse: bool = Fals
         else:
             return data[~space_check[col]]
 
-        
+
+def get_na_empty_space_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
+    """
+    Filters a dataframe to return only rows with na elements, empty strings or blank spaces.
+    Adds a columns stating which of the characters lead to the filtering (na, empty or space)
+    
+    Args:
+        data: the dataframe to be filtered
+        col: string defining the criterion. 
+            'any' (default) returns rows where any entry is na/empty string/space. 
+            '<col_name>' returns rows where entries in the column <col_name> are na/ empty string/space.
+            'all' returns rows where all entries are na.
+        reverse: if True, instead returns the complement of the filtered dataframe, i.e., 
+            all rows that do not have na/empty string/space entries (in any, all or a specific column, as defined by 'col')
+            
+    Returns:
+        the filtered dataframe
+    """
+    na_entries = get_na_entries(data, col, reverse)
+    na_entries['char'] = 'na'
+
+    empty_entries = get_empty_entries(data, col, reverse)
+    empty_entries['char'] = 'empty'
+
+    space_entries = get_space_entries(data, col, reverse)
+    space_entries['char'] = 'empty'
+
+    return pd.concat([na_entries,
+                      empty_entries,
+                      space_entries])
+
 
 def count_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
     """
