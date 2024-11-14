@@ -82,7 +82,7 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             for i, chunk in enumerate(reader):
                 print(f"Going through chunk {i}...")
                 result = pd.concat([result, fct(chunk)])
-                if not not save_every:
+                if save_every:
                     if (i+1) % save_every == 0:
                         result.to_csv(save +  f"__{i + 1 - save_every}_{i}.csv" + compress)  # save the df concatenated so far
                         result = pd.DataFrame()  # clear the df to avoid memory becoming too big
@@ -97,10 +97,10 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
                 print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
                 print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.")
 
-            if not not save and not save_every:
+            if  not not save and not save_every:
                 result.to_csv(save + ".csv" + compress)
                 print(f"saved data under {save}.csv" + compress)
-            elif not not save_every:
+            elif  not not save_every:
                 result.to_csv(save + f"__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)  # save the remaining data (if the number of chunks is not a multiple of save_every)
                 print(f"saved data under {save}__{i + 1 - (i+1) % save_every}_{i}.csv" + compress)
 
