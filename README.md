@@ -15,15 +15,14 @@ conda activate <env_name>
 pip install -r pip_requirements.txt
 ```
 ## Repository structure
-- 📁 `data`: 
-   - 📁 `psycache`: ?
-   - `results.ipynb`: Main notebook for Milestone 2.
+- 📁 `data`: clean and filtered data saved in the repository
+   - `dataset` 
 - :file_folder: `src`:
-   - `utils.py`: Utilities functions used in the notebooks.
+   - `utils.py`: Helper functions used in the notebook.
 - `.gitignore`: Specifies files and folders to ignore.
 - `README.md`: Main documentation file of the repository, providing an overview and general instructions.
 - `pip_requirements.txt`: List of packages required for our code.
-- `results.ipynb`: 
+- `results.ipynb`: Main work for Milestone 2.
 
 ## Abstract
 The common advice suggests that to stay well-informed, one should diversify its sources.  However, YouTube users often fall into clusters, groups formed by particularly active people within a channel. These clusters reflect communities invested into the same channel but don't yet imply that they don’t diversify their sources.
