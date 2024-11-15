@@ -66,7 +66,7 @@ We will look for the existence of multiple bubbles into the same cluster, which 
 
 Network graphs will help us visualize the links between users, showing both their levels of connectivity and isolation. Furthermore, A Venn diagram will complement this by illustrating the size of each bubble as well as their isolation through the extent of users overlap. 
 
-### Part 4: Bubble analysis
+### Part 4: Analyzing bubbles
 For each identified bubble, we will look at the following properties :
 
 - **Define a metric for the bubbles’ isolation**\
