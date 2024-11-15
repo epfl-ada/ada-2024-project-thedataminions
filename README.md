@@ -53,18 +53,18 @@ Next, we will define and isolate the clusters for analysis. To do so we will det
 ### Part 3: Identifying bubbles
 To identify bubbles within the News and Politics community, we will adopt two strategies :
 
-- **Compare the clusters of main channels to random pool of youtube users**\
+<div align="center">
+   <img src="src/figures/bubbles.jpg" alt="Bubbles identification diagram" width="60%">
+</div>
+
+- **Compare the clusters of main channels to random pool of Youtube users**(figure above, top part)\
 We will see if the clusters identified for each main channel represent a bubble, i.e  that they are closer  in the content they comment on than a random sample of Youtube users representing a control sample. This will be achieved by comparing the pairwise overlap values of the videos on which the cluster users have commented, to the one of the control sample. This will help us see if particularly active people in a main channel are more likely to watch/comment on similar content than a random group of Youtube users. If we observe a different behavior between our clusters and the control sample, we can classify our cluster as a bubble.
 
-- **Examine whether there are bubbles within a cluster**\
+- **Examine whether there are bubbles within a cluster**(figure above, bottom part)\
 We will look for the existence of multiple bubbles into the same cluster, which could show us divergence between commenters of the same channel. To do so we will use a flat clustering method such as DBSCAN (from [week 9 course](https://docs.google.com/presentation/d/1OWnmnm8oHRBz1JWymxFBNlClpVLLY9ke/edit#slide=id.p45
 )). Pairwise overlap between the users of the new bubbles will then measure their isolation from one another.
 
 Network graphs will help us visualize the links between users, showing both their levels of connectivity and isolation. Furthermore, A Venn diagram will complement this by illustrating the size of each bubble as well as their isolation through the extent of users overlap. 
-
-<div align="center">
-   <img src="src/figures/bubbles.jpg" alt="Bubbles identification diagram" width="60%">
-</div>
 
 ### Part 4: Bubble analysis
 For each identified bubble, we will look at the following properties :
@@ -73,7 +73,7 @@ For each identified bubble, we will look at the following properties :
 We will assess the degree of isolation, which relies on the overlap in the commented videos between users of both the same and different bubbles. For example, if users within a bubble commented on the same videos, respectively on totally different videos than users of another bubble, the former can be considered as highly isolated. To do so, we will use pairwise overlap calculations again.
 
 - **Are bubbles formed by the fact that users watch videos from the same channels, or of a same topic within News & Politics ?**\
-To assess this, we will analyze the descriptions of the videos viewed by users within a bubble. We will count how many times each word is employed, and see if a particular topic can be deduced from the frequency and the relevance of the formers. Searched topics will stay vast: political information, daily news, international news, case studies, etc. If common topics are found, we can conclude that the bubble is not only shaped by the users’ sources, but also by shared topic matter in News & Politics.
+To assess this, we will analyze the descriptions of the videos viewed by users within a bubble. We will count how many times each word is employed. Looking at their frequency and relevance we will see if a particular topic can be deduced. Searched topics will remain vast, i.e. political information, daily news, international news, case studies, etc. If common topics are found, we can conclude that the bubble is not only shaped by the users’ sources, but also by shared topic in News & Politics.
 
 - **How closely is a bubble associated with a particular video or channel ?**\
 For each video where a member of the bubble has commented, we will calculate the fraction of comments made by members of the same bubble. This is a measure for the “closeness of the video to the bubble”, which can then be expanded to encompass all videos on a channel, providing the “closeness of the channel to the bubble.”
