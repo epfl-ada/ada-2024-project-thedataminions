@@ -57,10 +57,10 @@ To identify bubbles within the News and Politics community, we will adopt two st
    <img src="src/figures/bubbles.jpg" alt="Bubbles identification diagram" width="60%">
 </div>
 
-- **Compare the clusters of main channels to random pool of Youtube users**(figure above, top part)\
+- **Compare the clusters of main channels to random pool of Youtube users** (figure above, top part)\
 We will see if the clusters identified for each main channel represent a bubble, i.e  that they are closer  in the content they comment on than a random sample of Youtube users representing a control sample. This will be achieved by comparing the pairwise overlap values of the videos on which the cluster users have commented, to the one of the control sample. This will help us see if particularly active people in a main channel are more likely to watch/comment on similar content than a random group of Youtube users. If we observe a different behavior between our clusters and the control sample, we can classify our cluster as a bubble.
 
-- **Examine whether there are bubbles within a cluster**(figure above, bottom part)\
+- **Examine whether there are bubbles within a cluster** (figure above, bottom part)\
 We will look for the existence of multiple bubbles into the same cluster, which could show us divergence between commenters of the same channel. To do so we will use a flat clustering method such as DBSCAN (from [week 9 course](https://docs.google.com/presentation/d/1OWnmnm8oHRBz1JWymxFBNlClpVLLY9ke/edit#slide=id.p45
 )). Pairwise overlap between the users of the new bubbles will then measure their isolation from one another.
 
