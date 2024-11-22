@@ -57,13 +57,15 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             for i, chunk in enumerate(reader):
                 print(f"Going through chunk {i}...")
                 result = pd.concat([result, fct(chunk)])
-                if not not save_every:
-                    if (i+1) % save_every == 0:
-                        result.to_csv(save +  f"__{i + 1 - save_every}_{i}.csv" + compress)  # save the df concatenated so far
-                        result = pd.DataFrame()  # clear the df to avoid memory becoming too big
-                        print(f"saved data under {save}__{i + 1 -save_every}_{i}.csv" + compress)
-                        collector = gc.collect()
-                        print(f"Collected {collector} garbages.")
+                if save_every and (i + 1) % save_every == 0:
+                    chunk_file = f"{save}__{i + 1 - save_every}_{i}.csv" + (compress or '')
+                    result.to_csv(chunk_file, index=False)
+                    print(f"Saved data under {chunk_file}")
+                    result = pd.DataFrame()  # Clear the DataFrame to save memory
+                    
+                    
+                    gc.collect()
+                    print(f"Garbage collected.")
                 time_end = time.time()
                 print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
             
@@ -107,10 +109,13 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             return result
 
 
+'''
+
 def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, 
                                            index: bool, index_label = None,
                                            every: int = 1, overwrite: bool = False,
-                                           print_time: bool | Tuple = False):
+                                           print_time: bool | Tuple = False,
+                                           strip_newlines: bool = False):
     """
     Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
     The function returns nothing, but saves the results into a single csv.
@@ -154,6 +159,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
                     result = pd.DataFrame()
             
             if not result.empty:  # if there is something left to apppend to the csv, do that now
+                #result.description.apply(lambda x : x.replace('\n',''))
                 result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                 print("Appended last rows to the csv file")
             return
@@ -203,6 +209,7 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
                     del result
                     gc.collect()
                     result = pd.DataFrame()
+                    result = result['cahnnekl_id', 'description']
                 time_end = time.time()
                 processed_entries = (i+1)*print_time[0]
                 entries_left = print_time[1] - processed_entries
@@ -218,6 +225,228 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
                 print("Appended last rows to the csv file")                   
                 print(f"Time spent saving: {time_save_end-time_save_start} secs")
             return
+'''
+
+
+def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, 
+                                           index: bool, index_label = None,
+                                           every: int = 1, overwrite: bool = False,
+                                           print_time: bool | Tuple = False,
+                                           video: bool = False):
+    """
+    Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
+    The function returns nothing, but saves the results into a single csv.
+
+    Args:
+        reader: iterator object that returns the chunks, you can get it for example by calling pd.read_csv(...., chunksize=something).
+        filename: file path and name, including the ending .csv, and optionally an ending for compression (such as .gz)
+        index: bool, will be passed directly to the to_csv function. If True, also saves the index.
+        index_label: can be string, list of strings, False or None (default). Is passed directly to the to_csv function.
+            If False, doesn't save a label for the index column. If None, uses the index name from the df. Otherwise, 
+            uses the given string. (Sequence is only used for multi index)
+        overwrite: if True (default is False), will overwrite existing file. Otherwise raises error.
+        every: will save every <every> chunks. Default is 1 (saves after every chunk)
+        print_time: If False (default), does not print time data. If True, prints the average time per chunk.
+            If a tuple with two entries is given, where the first is the chunk size used in the reader, 
+            and the second is the total number of entries in the dataset,
+            then additional data about estimated time left is printed.
+    """
+    
+    if os.path.isfile(filename) and overwrite is not True:
+        raise ValueError("The given file already exists.\nThis function will not overwrite files for data safety reasons, unless overwrite=True is passed.")
+    elif os.path.isfile(filename) and overwrite is True:
+        os.remove(filename)
+        print("Removed the existing file, because overwrite=True was passed.")
+    
+    # Predefined list of expected columns to ensure consistency
+    expected_columns_video = ['categories', 'channel_id', 'crawl_date', 'description', 
+                        'dislike_count', 'display_id', 'duration', 'like_count', 
+                        'tags', 'title', 'upload_date', 'view_count']
+    expected_columns_comments= ['author','video_id','likes','replies']
+    with reader:
+        header = True  # First chunk will have the header
+        result = pd.DataFrame()
+
+        if not print_time:
+            # Default chunk processing mode (without time tracking)
+            if video==True:
+                for i, chunk in enumerate(reader):
+                    chunk.columns = chunk.columns.str.strip()  # Remove extra spaces from column names
+                    chunk = chunk[expected_columns_video]  # Reorder columns to match the expected order
+
+                    # Apply the function to the chunk
+                    result = pd.concat([result, fct(chunk)], ignore_index=True)
+                    
+                    if (i + 1) % every == 0:
+                        result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                        header = False  # After the first chunk, don't write header again
+                        print(f"Appended new rows to the CSV file (after {i+1} chunks)")
+                        del result
+                        gc.collect()
+                        result = pd.DataFrame()
+
+                # After all chunks have been processed, save the remaining result
+                if not result.empty:
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                    print("Appended last rows to the CSV file")
+            else:
+                for i, chunk in enumerate(reader):
+                    chunk.columns = chunk.columns.str.strip()  # Remove extra spaces from column names
+                    chunk = chunk[expected_columns_comments]  # Reorder columns to match the expected order
+
+                    # Apply the function to the chunk
+                    result = pd.concat([result, fct(chunk)], ignore_index=True)
+                    
+                    if (i + 1) % every == 0:
+                        result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                        header = False  # After the first chunk, don't write header again
+                        print(f"Appended new rows to the CSV file (after {i+1} chunks)")
+                        del result
+                        gc.collect()
+                        result = pd.DataFrame()
+
+                # After all chunks have been processed, save the remaining result
+                if not result.empty:
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                    print("Appended last rows to the CSV file")
+        
+        elif print_time is True:
+            # Time logging with average time per chunk
+            time_start_global = time.time()
+            header = True
+            result = pd.DataFrame()
+
+            if video==True:
+                for i, chunk in enumerate(reader):
+                    print(f"Going through chunk {i}...")
+                    chunk.columns = chunk.columns.str.strip()
+                    chunk = chunk[expected_columns_video]
+                    
+                    result = pd.concat([result, fct(chunk)], ignore_index=True)
+                    
+                    if (i + 1) % every == 0:
+                        time_save_start = time.time()
+                        result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                        time_save_end = time.time()
+                        print("Appended new rows to the CSV file")
+                        print(f"Time spent saving: {time_save_end - time_save_start} secs")
+                        header = False
+                        del result
+                        gc.collect()
+                        result = pd.DataFrame()
+                    
+                    time_end = time.time()
+                    print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
+
+                if not result.empty:
+                    time_save_start = time.time()
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                    time_save_end = time.time()
+                    print("Appended last rows to the CSV file")                   
+                    print(f"Time spent saving: {time_save_end-time_save_start} secs")
+            else :
+                for i, chunk in enumerate(reader):
+                    print(f"Going through chunk {i}...")
+                    chunk.columns = chunk.columns.str.strip()
+                    chunk = chunk[expected_columns_comments]
+                    
+                    result = pd.concat([result, fct(chunk)], ignore_index=True)
+                    
+                    if (i + 1) % every == 0:
+                        time_save_start = time.time()
+                        result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                        time_save_end = time.time()
+                        print("Appended new rows to the CSV file")
+                        print(f"Time spent saving: {time_save_end - time_save_start} secs")
+                        header = False
+                        del result
+                        gc.collect()
+                        result = pd.DataFrame()
+                    
+                    time_end = time.time()
+                    print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
+
+                if not result.empty:
+                    time_save_start = time.time()
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                    time_save_end = time.time()
+                    print("Appended last rows to the CSV file")                   
+                    print(f"Time spent saving: {time_save_end-time_save_start} secs")
+
+        
+        else:
+            # Full time logging with remaining time estimation
+            time_start_global = time.time()
+            header = True
+            result = pd.DataFrame()
+
+            if video==True: 
+                for i, chunk in enumerate(reader):
+                    print(f"Going through chunk {i}...")
+                    chunk.columns = chunk.columns.str.strip()
+                    chunk = chunk[expected_columns_video]
+                    
+                    result = pd.concat([result, fct(chunk)], ignore_index=True)
+                    
+                    if (i + 1) % every == 0:
+                        time_save_start = time.time()
+                        result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                        time_save_end = time.time()
+                        print("Appended new rows to the CSV file")                   
+                        print(f"Time spent saving: {time_save_end-time_save_start} secs\n")
+                        header = False
+                        del result
+                        gc.collect()
+                        result = pd.DataFrame()
+
+                    time_end = time.time()
+                    processed_entries = (i + 1) * print_time[0]
+                    entries_left = print_time[1] - processed_entries
+                    avg_time_per_chunk = (time_end - time_start_global) / (i + 1)
+                    print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
+                    print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk / (print_time[0] * 60):.3f} minutes left.\n")
+
+                if not result.empty:
+                    time_save_start = time.time()
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                    time_save_end = time.time()
+                    print("Appended last rows to the CSV file")                   
+                    print(f"Time spent saving: {time_save_end-time_save_start} secs")
+            else: 
+                for i, chunk in enumerate(reader):
+                    print(f"Going through chunk {i}...")
+                    chunk.columns = chunk.columns.str.strip()
+                    chunk = chunk[expected_columns_comments]
+                    
+                    result = pd.concat([result, fct(chunk)], ignore_index=True)
+                    
+                    if (i + 1) % every == 0:
+                        time_save_start = time.time()
+                        result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                        time_save_end = time.time()
+                        print("Appended new rows to the CSV file")                   
+                        print(f"Time spent saving: {time_save_end-time_save_start} secs\n")
+                        header = False
+                        del result
+                        gc.collect()
+                        result = pd.DataFrame()
+
+                    time_end = time.time()
+                    processed_entries = (i + 1) * print_time[0]
+                    entries_left = print_time[1] - processed_entries
+                    avg_time_per_chunk = (time_end - time_start_global) / (i + 1)
+                    print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
+                    print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk / (print_time[0] * 60):.3f} minutes left.\n")
+
+                if not result.empty:
+                    time_save_start = time.time()
+                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
+                    time_save_end = time.time()
+                    print("Appended last rows to the CSV file")                   
+                    print(f"Time spent saving: {time_save_end-time_save_start} secs")
+
+        
+    return
 
 
 def get_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
