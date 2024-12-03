@@ -843,7 +843,6 @@ def get_video_user_matrix(users_to_consider: pd.Series,
     # them indices which correspond to their column in the matrix)
     user_id_int_mapping = get_int_mapping(users_to_consider)
     
-    
     # Now for the actual calculations:
 
     # initiate empty row and column index lists
@@ -880,7 +879,7 @@ def get_video_user_matrix(users_to_consider: pd.Series,
         # By creating a sparse array, we can remove these duplicates. In theory, it would be enough
         # to remove all duplicates at the end, however we need to do it more often, because otherwise
         # our lists of entries become too large and need too much memory.
-        if i % 10 == 0:
+        if i % 10 == 0 and len(rows) > 10000000:
             data = np.ones_like(rows, dtype=bool)  # create data for the entries
 
             if print_stats:
@@ -895,7 +894,14 @@ def get_video_user_matrix(users_to_consider: pd.Series,
                                                             dtype=bool)
             intermediate_coo_array.sum_duplicates()  # remove the duplicates
             (rows, cols) = intermediate_coo_array.coords  # get the new rows and cols from the array
+            
+            # delete data not needed anymore and garbage collect
             del intermediate_coo_array
+            del data
+            if print_stats:
+                print(f"{gc.collect()} garbages collected")
+            else:
+                gc.collect()
 
             # convert the data to lists again
             rows = rows.tolist()
@@ -921,12 +927,24 @@ def get_video_user_matrix(users_to_consider: pd.Series,
     # Now create an array full of "True", the same length as the list of row indices
     data = np.ones_like(rows, dtype=bool)
 
-    # Create the matrix
+    # Create the matrix and convert to csc sparse matrix format because this is much 
+    # faster for getting columns than coo format
     video_author_matrix = scipy.sparse.coo_matrix((data, (rows, cols)), 
                                                  shape=(len(video_id_int_mapping),
                                                         len(user_id_int_mapping)),
-                                                 dtype=bool)
-
+                                                 dtype=bool).tocsc()
+    # delete data not needed anymore and garbage collect
+    del rows
+    del cols
+    del data
+    del newrows
+    del newcols
+    del user_id_int_mapping
+    if print_stats:
+        print(f"{gc.collect()} garbages collected")
+    else:
+        gc.collect()
+    
     # Save the array
     scipy.sparse.save_npz(filename, 
                           video_author_matrix)
