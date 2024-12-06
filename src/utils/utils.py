@@ -951,3 +951,82 @@ def get_video_user_matrix(users_to_consider: pd.Series,
     print(f"Saved file {filename}")
 
     return video_author_matrix
+
+
+def add_zero_cols_to_sparse_matrix(matrix: scipy.sparse.csc_matrix, col_indices) -> scipy.sparse.csc_matrix:
+    """
+    Adds columns with all zeros (a.k.a. empty values) after all the speified column indices.
+    The given row indices refer to the matrix in its finished state.
+
+    For example, if a matrix with 3 columns is given (initial indices 0, 1, 2), together with
+    col_indices=[1, 3, 4], zero columns will be put after the second original column, after
+    the fourth column which was the third initial column, and another one after the fifth 
+    column, which is the empty column just created.
+
+    Example: 
+                                                    1   2   3
+    col_indices=[1, 3, 4] with initial matrix:  A=  4   5   6
+                                                    7   8   9
+                        1   2   0   3   0   0
+    Resulting matrix:   4   5   0   5   0   0
+                        7   8   0   9   0   0
+    
+    Args:
+        matrix: sparse matrix to add the empty columns tp
+        col_indices: places where the columns are to be put. For example, if a matrix with 
+            three columns are given, and 
+    """
+
+    list_of_sparse_blocks = []
+
+    empty_col = scipy.sparse.csc_matrix((matrix.shape[0], 1), dtype=matrix.dtype)
+
+    for i, index in enumerate(col_indices):
+        list_of_sparse_blocks.append(matrix[:,:index + i])
+    
+    return scipy.sparse.hstack([sparse_block.append(empty_col) for sparse_block in list_of_sparse_blocks][:-1])
+
+
+def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix, 
+                    video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
+                    user_id_mapping_1: Optional[pd.Series] = None,
+                    user_id_mapping_2: Optional[pd.Series] = None) -> scipy.sparse.csc_matrix:
+    """
+    Gets a user-user "overlap" matrix, i.e. a matrix showing the amount of videos two users
+    have both commented on, based on a given video-user matrix, or optionally two.
+    If one matrix is given, calculates the "overlap" for all pairs of users from the matrix.
+    If two matrices are given, calculates the overlap for all pairs of users from the two
+    different matrices, but first adds empty columns to the matrices such that they both
+    share the same columns.
+
+    No filtering or anything is done, i.e., the resulting matrix might include the overlap
+    of users with themselves, etc.
+
+    Args:
+        video_user_matrix: video user matrix containing information about which videos 
+            users have commented on
+        video_user_matrix_2: optional second video user matrix. If this is given, the users 
+            in the first matrix
+        user_id_mapping_1: mapping of the column indices of matrix 1 to the original unique
+            user ids. Mandatory if video user matrix 2 is given
+        user_id_mapping_2: see above, but for video user matrix 2
+
+
+    Returns:
+        c_true_true matrix, meaning that 
+    
+    Raises:
+        ValueError: If two matrices are given and don't have the same number of rows, or if
+            no user id mappings where given, or if they have the wrong size.
+    """
+
+    if video_user_matrix_2 is None:
+        return video_user_matrix.T @ video_user_matrix
+    elif user_id_mapping_1 is None or user_id_mapping_2 is None:
+        raise ValueError("No user id mapping was given.")
+    elif len(user_id_mapping_1) != video_user_matrix.shape[0] or len(user_id_mapping_2) != video_user_matrix_2.shape[0]:
+        raise ValueError("User id mapping has wrong size for number of columns.")
+    elif video_user_matrix.shape[0] != video_user_matrix_2.shape[0]:
+        raise ValueError("Given matrices don't share the same row length.")
+    
+
