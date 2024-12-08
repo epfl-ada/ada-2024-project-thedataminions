@@ -1026,16 +1026,13 @@ def get_video_user_matrices_with_equal_columns(video_user_matrix_1: scipy.sparse
 
 
 def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix, 
-                    video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
-                    user_id_mapping_1: Optional[pd.Series] = None,
-                    user_id_mapping_2: Optional[pd.Series] = None) -> scipy.sparse.csc_matrix:
+                    video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None) -> scipy.sparse.csc_matrix:
     """
     Gets a user-user "overlap" matrix, i.e. a matrix showing the amount of videos two users
     have both commented on, based on a given video-user matrix, or optionally two.
     If one matrix is given, calculates the "overlap" for all pairs of users from the matrix.
     If two matrices are given, calculates the overlap for all pairs of users from the two
-    different matrices, but first adds empty columns to the matrices such that they both
-    share the same columns.
+    different matrices.
 
     No filtering or anything is done, i.e., the resulting matrix might include the overlap
     of users with themselves, etc.
@@ -1045,9 +1042,6 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
             users have commented on
         video_user_matrix_2: optional second video user matrix. If this is given, the users 
             in the first matrix
-        user_id_mapping_1: mapping of the column indices of matrix 1 to the original unique
-            user ids. Mandatory if video user matrix 2 is given
-        user_id_mapping_2: see above, but for video user matrix 2
 
 
     Returns:
@@ -1060,10 +1054,10 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
     # which are higher than the number of videos any user has commented on, and no user has 
     # commented on more than 17262 videos, in all of our clusters.
     # By using int16 instead of int, we save memory
-    video_user_matrix = video_user_matrix.astype(np.int16)
+    # video_user_matrix = video_user_matrix.astype(np.int16)
 
     if video_user_matrix_2 is None:
-        return video_user_matrix.T @ video_user_matrix
+        return (video_user_matrix.T @ video_user_matrix).astype(np.int16)
     elif video_user_matrix.shape[0] != video_user_matrix_2.shape[0]:
         raise ValueError("Given matrices don't share the same row length.")
     else:
@@ -1097,14 +1091,14 @@ def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # which are higher than the number of videos any user has commented on, and no user has 
     # commented on more than 17262 videos, in all of our clusters.
     # By using int16 instead of int, we save memory
-    video_user_matrix = video_user_matrix.astype(np.int16)
+    # video_user_matrix = video_user_matrix.astype(np.int16)
 
     matrix_T_times_ones = video_user_matrix.T.sum(axis=1, dtype=np.int16)
     print(f"Dtype of matrix_T_times_ones is {matrix_T_times_ones.dtype}")
 
     if video_user_matrix_2 is None:
         
-        result = matrix_T_times_ones - video_user_matrix.transpose() @ video_user_matrix
+        result = matrix_T_times_ones - (video_user_matrix.transpose() @ video_user_matrix).astype(np.int16)
         if where is None:
             return result
         else:
@@ -1114,7 +1108,7 @@ def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix,
         raise ValueError("Given matrices don't share the same row length.")
     
     else:
-        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        # video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
         result = matrix_T_times_ones - np.matmul(video_user_matrix.transpose(), video_user_matrix_2, dtype=np.int16)
         if where is None:
             return result
@@ -1151,13 +1145,13 @@ def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # which are higher than the number of videos any user has commented on, and no user has 
     # commented on more than 17262 videos, in all of our clusters.
     # By using int16 instead of int, we save memory
-    video_user_matrix = video_user_matrix.astype(np.int16)
+    # video_user_matrix = video_user_matrix.astype(np.int16)
 
     if video_user_matrix_2 is None:
         
         ones_times_matrix = video_user_matrix.sum(axis=0, dtype=np.int16)
         
-        result = ones_times_matrix - video_user_matrix.T @ video_user_matrix
+        result = ones_times_matrix - (video_user_matrix.T @ video_user_matrix).astype(np.int16)
         
         if where is None:
             return result
@@ -1169,10 +1163,10 @@ def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     
     else:
         # convert to np.int16 again
-        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        # video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
         ones_times_matrix = video_user_matrix_2.sum(axis=0, dtype=np.int16)
 
-        result = ones_times_matrix - video_user_matrix_2.T @ video_user_matrix
+        result = ones_times_matrix - (video_user_matrix_2.T @ video_user_matrix).astype(np.int16)
 
         if where is None:
             return result
@@ -1204,11 +1198,15 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
 
     # get C_tt matrix
     c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2)
-    print(c_tt)
+    print("c_tt calculated")
+
+    c_tt_non_zero = c_tt.astype(bool).toarray()
+
     # get C_tf matrix
-    c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2)
-    print(c_tf)
-    del c_tf
+
+    # c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2)
+    # print(c_tf)
+    # del c_tf
     
     # remove all entries which are 0 in the C_tt matrix from the C_tf matrix, then make sparse
     # (idea: when C_tt is 0, then the division result of C_tt / (C_tt + C_tf + C_ft) (for 
@@ -1220,50 +1218,81 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     #  for C_tf = 0))
 
     # c_tf = scipy.sparse.csc_matrix(np.multiply(c_tf ,c_tt.astype(bool).astype(np.int32).toarray()))
-    c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt.astype(bool).toarray())
-    print(c_tf)
+    # c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
+    denominator = c_tt + get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
+    print("c_tf calculated")
 
     # get C_ft matrix
-    c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2)
-    print(c_ft)
-    del c_ft
+
+    # c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2)
+    # print(c_ft)
+    # del c_ft
+
     # remove all entries which are 0 in the C_tt matrix from the C_ft matrix, then make sparse
     # c_ft = scipy.sparse.csc_matrix(np.multiply(c_ft,c_tt.astype(bool).astype(np.int32).toarray()))
-    c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt.astype(bool).toarray())
+    # c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
+    denominator += get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
 
     # calculate the denominator
-    print(c_tt)
-    print(c_tf)
-    print(c_ft)
-    denominator = c_tt + c_tf + c_ft
-    print("Summing nominator done. Looks like this:")
+    # print(c_tt)
+    # print(c_tf)
+    # print(c_ft)
+    # denominator = c_tt + c_tf + c_ft
+    print("Calculated c_ft, and summing nominator done. Looks like this:")
     print(denominator)
     print("And has this shape")
     print(denominator.shape)
     print("The numeraor will have this shape:")
     print(c_tt.shape)
-    print("This is where the true values of the numerator are:")
-    print(c_tt.astype(bool))
+    # print("This is where the true values of the numerator are:")
+    # print(c_tt.astype(bool))
     # denominator = np.multiply(denominator,c_tt.astype(bool).astype(np.int32).toarray())#np.multiply(denominator, c_tt.astype(bool))
     # print("Removing elements in denominator which are 0 in numerator done. Still an array, looks like this:")
     # print(denominator)
     # denominator = scipy.sparse.csc_matrix(denominator, dtype=np.float32)
     # print("Converting denominator to sparse done, looks like this:")
     # print(denominator)
-    numerator = c_tt#.astype(np.float32)
+    # numerator = c_tt#.astype(np.float32)
     print("This is the numerator:")
-    print(numerator)
+    print(c_tt)
     # del c_tt
-    del c_tf
-    del c_ft
+    # del c_tf
+    # del c_ft
     print("Got all the matrices. Starting division....")
     if precision is 32:
-        result = np.zeros(numerator.shape, dtype=np.float32)
+        result = np.zeros(c_tt.shape, dtype=np.float32)
     elif precision is 16:
-        result = np.zeros(numerator.shape, dtype=np.float16)
-    np.divide(numerator.toarray(),
+        result = np.zeros(c_tt.shape, dtype=np.float16)
+    np.divide(c_tt.toarray(),
               denominator.toarray(),
-              where=c_tt.astype(bool).toarray(), out=result)
+              where=c_tt_non_zero, out=result)
     print("Division done. Result is:")
     print(result)
     return result
+
+
+def get_mean_without_duplicates(matrix: np.ndarray) -> float:
+    """
+    Takes the mean of all values of a matrix, but ignores the values on the diagonal.
+    The assumtion is that on the diagonal, we are comparing one user to themselves,
+    which is not a relevant metric.
+    
+    Args:
+        matrix: a sparse square matrix with distance values, e.g. jaccard distance, for all pairs
+            of users.
+    Returns:
+        mean of all values excluding the original
+    
+    Raises:
+        ValueError: if given matrix is not square
+    """
+
+    if matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Given matrix is not square")
+    
+    matrix = np.fill_diagonal(matrix, 0)
+
+    sum_of_entries = matrix.sum(axis=None)
+    num_of_entries_without_diag = matrix.shape[0] * matrix.shape[1] - matrix.shape[0]
+
+    return sum_of_entries / num_of_entries_without_diag
