@@ -991,6 +991,40 @@ def add_zero_cols_to_sparse_matrix(matrix: scipy.sparse.csc_matrix, col_indices)
     return scipy.sparse.hstack(list_of_sparse_blocks)
 
 
+def get_video_user_matrices_with_equal_columns(video_user_matrix_1: scipy.sparse.csc_matrix,
+                                               video_user_matrix_2: scipy.sparse.csc_matrix,
+                                               user_ids_1: pd.Series, 
+                                               user_ids_2: pd.Series) -> Tuple[scipy.sparse.csc_matrix,
+                                                                                 scipy.sparse.csc_matrix]:
+    """
+    Takes two video user matrices with the columns possibly corresponding to different users.
+    Expands these two matrices by adding empty columns, so that both matrices share the same
+    columns. This makes a comparison afterwards more easy, because we know that the user in
+    column i in one of the matrices is the same as user i in the other matrix.
+
+    Args:
+        video_user_matrix_1: sparse video user matrix for one cluster
+        video_user_matrix_2: sparse video user matrix for another cluster
+        user_id_mapping_1: mapping containing the user id_s of 
+    """
+    raise Exception("This doesn't work yet!")
+
+    # get Series of all users that are in one of the matrices (= union of the users in both
+    # given mappings)
+    # These users will be the columns in the resulting matrices
+    all_user_ids = pd.concat([user_ids_1, user_ids_2]).drop_duplicates()
+
+    # find which of these users are "missing" in the users of the two given matrices
+    columns_to_add_to_matrix_1 = ~all_user_ids.isin(user_ids_1)
+    columns_to_add_to_matrix_2 = ~all_user_ids.isin(user_ids_2)
+
+    # add empty columns in order to get both matrices to the same columns
+    matrix_1_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix_1, columns_to_add_to_matrix_1)
+    matrix_2_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix_2, columns_to_add_to_matrix_2)
+
+    return (matrix_1_with_added_cols, matrix_2_with_added_cols)
+
+
 def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix, 
                     video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
                     user_id_mapping_1: Optional[pd.Series] = None,
@@ -1020,8 +1054,7 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
         c_true_true matrix, meaning that the entries are true when both users have commented
     
     Raises:
-        ValueError: If two matrices are given and don't have the same number of rows, or if
-            no user id mappings where given, or if they have the wrong size.
+        ValueError: If two matrices are given and don't have the same number of rows
     """
     # we can use int16 (can display values up to +32767), because we will never have values
     # which are higher than the number of videos any user has commented on, and no user has 
@@ -1031,26 +1064,12 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
 
     if video_user_matrix_2 is None:
         return video_user_matrix.T @ video_user_matrix
-    
-    elif user_id_mapping_1 is None or user_id_mapping_2 is None:
-        raise ValueError("No user id mapping was given.")
-    elif len(user_id_mapping_1) != video_user_matrix.shape[0] or len(user_id_mapping_2) != video_user_matrix_2.shape[0]:
-        raise ValueError("User id mapping has wrong size for number of columns.")
     elif video_user_matrix.shape[0] != video_user_matrix_2.shape[0]:
         raise ValueError("Given matrices don't share the same row length.")
+    else:
+        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        return video_user_matrix.T @ video_user_matrix_2
     
-    video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
-
-    all_user_ids = pd.concat([user_id_mapping_1, user_id_mapping_2]).drop_duplicates()
-
-    columns_to_add_to_matrix_1 = ~all_user_ids.isin(user_id_mapping_1)
-    columns_to_add_to_matrix_2 = ~all_user_ids.isin(user_id_mapping_2)
-
-    matrix_1_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix, columns_to_add_to_matrix_1)
-    matrix_2_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix_2, columns_to_add_to_matrix_2)
-
-    return matrix_1_with_added_cols.T @ matrix_2_with_added_cols
-
 
 def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix, 
                             video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
@@ -1090,6 +1109,9 @@ def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix,
             return result
         else:
             return scipy.sparse.csc_matrix(np.multiply(result, where))
+        
+    elif video_user_matrix.shape[0] != video_user_matrix_2.shape[0]:
+        raise ValueError("Given matrices don't share the same row length.")
     
     else:
         video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
@@ -1141,7 +1163,10 @@ def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix,
             return result
         else:
             return scipy.sparse.csc_matrix(np.multiply(result, where))
-            
+        
+    elif video_user_matrix.shape[0] != video_user_matrix_2.shape[0]:
+        raise ValueError("Given matrices don't share the same row length.")
+    
     else:
         # convert to np.int16 again
         video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
@@ -1174,7 +1199,7 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     
     """
 
-    if precision is not in [16, 32]:
+    if precision not in [16, 32]:
         raise ValueError("Given precision must be 16 or 32")
 
     # get C_tt matrix
