@@ -955,17 +955,17 @@ def get_video_user_matrix(users_to_consider: pd.Series,
 
 def add_zero_cols_to_sparse_matrix(matrix: scipy.sparse.csc_matrix, col_indices) -> scipy.sparse.csc_matrix:
     """
-    Adds columns with all zeros (a.k.a. empty values) after all the speified column indices.
+    Adds columns with all zeros (a.k.a. empty values) at all the speified column indices.
     The given row indices refer to the matrix in its finished state.
 
     For example, if a matrix with 3 columns is given (initial indices 0, 1, 2), together with
-    col_indices=[1, 3, 4], zero columns will be put after the second original column, after
+    col_indices=[2, 4, 5], zero columns will be put after the second original column, after
     the fourth column which was the third initial column, and another one after the fifth 
     column, which is the empty column just created.
 
     Example: 
                                                     1   2   3
-    col_indices=[1, 3, 4] with initial matrix:  A=  4   5   6
+    col_indices=[2, 4, 5] with initial matrix:  A=  4   5   6
                                                     7   8   9
                         1   2   0   3   0   0
     Resulting matrix:   4   5   0   5   0   0
@@ -980,11 +980,15 @@ def add_zero_cols_to_sparse_matrix(matrix: scipy.sparse.csc_matrix, col_indices)
     list_of_sparse_blocks = []
 
     empty_col = scipy.sparse.csc_matrix((matrix.shape[0], 1), dtype=matrix.dtype)
-
+    old_index = 0
     for i, index in enumerate(col_indices):
-        list_of_sparse_blocks.append(matrix[:,:index + i])
+        list_of_sparse_blocks.append(matrix[:,old_index:index - i].copy())
+        old_index = index - i
+        list_of_sparse_blocks.append(empty_col)
     
-    return scipy.sparse.hstack([sparse_block.append(empty_col) for sparse_block in list_of_sparse_blocks][:-1])
+    list_of_sparse_blocks.append(matrix[:,old_index:])
+
+    return scipy.sparse.hstack(list_of_sparse_blocks)
 
 
 def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix, 
@@ -1013,15 +1017,21 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
 
 
     Returns:
-        c_true_true matrix, meaning that 
+        c_true_true matrix, meaning that the entries are true when both users have commented
     
     Raises:
         ValueError: If two matrices are given and don't have the same number of rows, or if
             no user id mappings where given, or if they have the wrong size.
     """
+    # we can use int16 (can display values up to +32767), because we will never have values
+    # which are higher than the number of videos any user has commented on, and no user has 
+    # commented on more than 17262 videos, in all of our clusters.
+    # By using int16 instead of int, we save memory
+    video_user_matrix = video_user_matrix.astype(np.int16)
 
     if video_user_matrix_2 is None:
         return video_user_matrix.T @ video_user_matrix
+    
     elif user_id_mapping_1 is None or user_id_mapping_2 is None:
         raise ValueError("No user id mapping was given.")
     elif len(user_id_mapping_1) != video_user_matrix.shape[0] or len(user_id_mapping_2) != video_user_matrix_2.shape[0]:
@@ -1029,4 +1039,206 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
     elif video_user_matrix.shape[0] != video_user_matrix_2.shape[0]:
         raise ValueError("Given matrices don't share the same row length.")
     
+    video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
 
+    all_user_ids = pd.concat([user_id_mapping_1, user_id_mapping_2]).drop_duplicates()
+
+    columns_to_add_to_matrix_1 = ~all_user_ids.isin(user_id_mapping_1)
+    columns_to_add_to_matrix_2 = ~all_user_ids.isin(user_id_mapping_2)
+
+    matrix_1_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix, columns_to_add_to_matrix_1)
+    matrix_2_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix_2, columns_to_add_to_matrix_2)
+
+    return matrix_1_with_added_cols.T @ matrix_2_with_added_cols
+
+
+def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix, 
+                            video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
+                            where: Optional[np.ndarray] = None) -> np.ndarray | scipy.sparse.csc_matrix:
+    """
+    Gets matrix showing for which entries user i has not commented but user j has.
+    If one matrix is given, does it for all pairs of users from this matrix,
+    otherwise does it for the first to the second matrix.
+
+    No filtering w.r.t duplicates etc. is done here.
+
+    Args:
+        video_user_matrix: video user matrix containing information about which videos 
+            users have commented on
+        video_user_matrix_2: optional second video user matrix. If this is given, the users 
+            in the first matrix
+        where: optional bool array of same size as the result. If given, then the C_ft matrix
+            will have value 0 in all entries where this matric is false. It will also be returned
+            as a sparse csc matrix instead of a np array, to make use of this sparsity
+
+    Returns:
+        false true matrix
+    """
+    # we can use int16 (can display values up to +32767), because we will never have values
+    # which are higher than the number of videos any user has commented on, and no user has 
+    # commented on more than 17262 videos, in all of our clusters.
+    # By using int16 instead of int, we save memory
+    video_user_matrix = video_user_matrix.astype(np.int16)
+
+    matrix_T_times_ones = video_user_matrix.T.sum(axis=1, dtype=np.int16)
+    print(f"Dtype of matrix_T_times_ones is {matrix_T_times_ones.dtype}")
+
+    if video_user_matrix_2 is None:
+        
+        result = matrix_T_times_ones - video_user_matrix.transpose() @ video_user_matrix
+        if where is None:
+            return result
+        else:
+            return scipy.sparse.csc_matrix(np.multiply(result, where))
+    
+    else:
+        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        result = matrix_T_times_ones - np.matmul(video_user_matrix.transpose(), video_user_matrix_2, dtype=np.int16)
+        if where is None:
+            return result
+        else:
+            return scipy.sparse.csc_matrix(np.multiply(result, where))
+
+    
+
+def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix, 
+                            video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
+                            where: Optional[np.ndarray] = None) -> np.ndarray | scipy.sparse.csc_matrix:
+    """
+    Gets matrix showing for which entries user i has commented on but user j has not.
+    If one matrix is given, does it for all pairs of users from this matrix,
+    otherwise does it for the first to the second matrix.
+
+    No filtering w.r.t duplicates etc. is done here.
+
+    Args:
+        video_user_matrix: video user matrix containing information about which videos 
+            users have commented on
+        video_user_matrix_2: optional second video user matrix. If this is given, the users 
+            in the first matrix
+        where: optional bool array of same size as the result. If given, then the C_ft matrix
+            will have value 0 in all entries where this matric is false. It will also be returned
+            as a sparse csc matrix instead of a np array, to make use of this sparsity
+
+
+    Returns:
+        true false matrix
+    """
+
+    # we can use int16 (can display values up to +32767), because we will never have values
+    # which are higher than the number of videos any user has commented on, and no user has 
+    # commented on more than 17262 videos, in all of our clusters.
+    # By using int16 instead of int, we save memory
+    video_user_matrix = video_user_matrix.astype(np.int16)
+
+    if video_user_matrix_2 is None:
+        
+        ones_times_matrix = video_user_matrix.sum(axis=0, dtype=np.int16)
+        
+        result = ones_times_matrix - video_user_matrix.T @ video_user_matrix
+        
+        if where is None:
+            return result
+        else:
+            return scipy.sparse.csc_matrix(np.multiply(result, where))
+            
+    else:
+        # convert to np.int16 again
+        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        ones_times_matrix = video_user_matrix_2.sum(axis=0, dtype=np.int16)
+
+        result = ones_times_matrix - video_user_matrix_2.T @ video_user_matrix
+
+        if where is None:
+            return result
+        else:
+            return scipy.sparse.csc_matrix(np.multiply(result, where))
+    
+
+def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
+                             video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
+                             precision: int = 32) -> np.array:
+    """
+    Gets the jaccard distance, defined as (c_tt) / (c_tt + c_tf + c_ft)
+    If one matrix is given, does it for all pairs of users in this matrix,
+    if two are given, does it for all pairs from these two matrices.
+    
+    Args:
+        video_user_matrix: video user matrix
+        video_user_matrix: optional second video user matrix (eg., from another cluster)
+        precision: optional specification of float precision to use for the final division.
+            Default is 32
+        
+    Returns:
+        Jaccard index matrix. Note that no filtering or removal of duplicate users is done here.
+    
+    """
+
+    if precision is not in [16, 32]:
+        raise ValueError("Given precision must be 16 or 32")
+
+    # get C_tt matrix
+    c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2)
+    print(c_tt)
+    # get C_tf matrix
+    c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2)
+    print(c_tf)
+    del c_tf
+    
+    # remove all entries which are 0 in the C_tt matrix from the C_tf matrix, then make sparse
+    # (idea: when C_tt is 0, then the division result of C_tt / (C_tt + C_tf + C_ft) (for 
+    #  for jaccard index) will be 0 anyway, so no need to consider these entries in C_tf and 
+    #  C_ft. In this way, we save space and can make the matrices more sparse.)
+    # (Because C_tt is much more sparse than C_tt, because there will be user pairs which have
+    #  no videos in common (meaning C_tt = 0), but there will hardly be any user pairs which
+    #  have no videos which one has commented on but the other hasn't (which would be needed
+    #  for C_tf = 0))
+
+    # c_tf = scipy.sparse.csc_matrix(np.multiply(c_tf ,c_tt.astype(bool).astype(np.int32).toarray()))
+    c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt.astype(bool).toarray())
+    print(c_tf)
+
+    # get C_ft matrix
+    c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2)
+    print(c_ft)
+    del c_ft
+    # remove all entries which are 0 in the C_tt matrix from the C_ft matrix, then make sparse
+    # c_ft = scipy.sparse.csc_matrix(np.multiply(c_ft,c_tt.astype(bool).astype(np.int32).toarray()))
+    c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt.astype(bool).toarray())
+
+    # calculate the denominator
+    print(c_tt)
+    print(c_tf)
+    print(c_ft)
+    denominator = c_tt + c_tf + c_ft
+    print("Summing nominator done. Looks like this:")
+    print(denominator)
+    print("And has this shape")
+    print(denominator.shape)
+    print("The numeraor will have this shape:")
+    print(c_tt.shape)
+    print("This is where the true values of the numerator are:")
+    print(c_tt.astype(bool))
+    # denominator = np.multiply(denominator,c_tt.astype(bool).astype(np.int32).toarray())#np.multiply(denominator, c_tt.astype(bool))
+    # print("Removing elements in denominator which are 0 in numerator done. Still an array, looks like this:")
+    # print(denominator)
+    # denominator = scipy.sparse.csc_matrix(denominator, dtype=np.float32)
+    # print("Converting denominator to sparse done, looks like this:")
+    # print(denominator)
+    numerator = c_tt#.astype(np.float32)
+    print("This is the numerator:")
+    print(numerator)
+    # del c_tt
+    del c_tf
+    del c_ft
+    print("Got all the matrices. Starting division....")
+    if precision is 32:
+        result = np.zeros(numerator.shape, dtype=np.float32)
+    elif precision is 16:
+        result = np.zeros(numerator.shape, dtype=np.float16)
+    np.divide(numerator.toarray(),
+              denominator.toarray(),
+              where=c_tt.astype(bool).toarray(), out=result)
+    print("Division done. Result is:")
+    print(result)
+    return result
