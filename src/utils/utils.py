@@ -995,7 +995,7 @@ def get_video_user_matrices_with_equal_columns(video_user_matrix_1: scipy.sparse
                                                video_user_matrix_2: scipy.sparse.csc_matrix,
                                                user_ids_1: pd.Series, 
                                                user_ids_2: pd.Series) -> Tuple[scipy.sparse.csc_matrix,
-                                                                                 scipy.sparse.csc_matrix]:
+                                                                               scipy.sparse.csc_matrix]:
     """
     Takes two video user matrices with the columns possibly corresponding to different users.
     Expands these two matrices by adding empty columns, so that both matrices share the same
@@ -1005,24 +1005,83 @@ def get_video_user_matrices_with_equal_columns(video_user_matrix_1: scipy.sparse
     Args:
         video_user_matrix_1: sparse video user matrix for one cluster
         video_user_matrix_2: sparse video user matrix for another cluster
-        user_id_mapping_1: mapping containing the user id_s of 
+        user_ids_1: mapping containing the original user id's as values, for matrix 1
+        user_ids_2: the same for matrix 2
     """
-    raise Exception("This doesn't work yet!")
+    # raise Exception("This doesn't work yet!")
 
+    # First verify that the two user id mappings are ordered in the same way, namely that
+    # the original user id's are sorted in ascending order.
+    # Otherwise the transformation we are going to do will not work
+    print("Verifying that given user id Series are sorted corectly....")
+    if (user_ids_1.sort_values().values != user_ids_1.values).any():
+        raise ValueError("The given user id mapping 1 does not have the index sorted correctly.")
+    elif (user_ids_2.sort_values() != user_ids_2).any():
+        raise ValueError("The given user_id_mapping_2 does not have the index sorted correctly.")
+    print("Done.")
+
+    
     # get Series of all users that are in one of the matrices (= union of the users in both
     # given mappings)
     # These users will be the columns in the resulting matrices
-    all_user_ids = pd.concat([user_ids_1, user_ids_2]).drop_duplicates()
-
+    print("Concatting the users from both clusters and dropping duplicate values...")
+    all_user_ids = pd.concat([user_ids_1, user_ids_2])
+    # drop duplicate original user id's
+    all_user_ids.drop_duplicates(inplace=True)
+    print("Done.")
+    # print(all_user_ids)
+    print("Sorting the user ids in ascending order....")
+    all_user_ids.sort_values(inplace=True)
+    print("Done.")
+    # print(all_user_ids)
+    
     # find which of these users are "missing" in the users of the two given matrices
-    columns_to_add_to_matrix_1 = ~all_user_ids.isin(user_ids_1)
-    columns_to_add_to_matrix_2 = ~all_user_ids.isin(user_ids_2)
+    print("Getting indices where empty columns are to be added for both matrices....")
+    columns_to_add_to_matrix_1 = np.flatnonzero((~all_user_ids.isin(user_ids_1)).values)
+    columns_to_add_to_matrix_2 = np.flatnonzero((~all_user_ids.isin(user_ids_2)).values)
+    print("Done.")
 
     # add empty columns in order to get both matrices to the same columns
+    print("Adding the empty columns....")
     matrix_1_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix_1, columns_to_add_to_matrix_1)
+    print("Matrix 1 done.")
     matrix_2_with_added_cols = add_zero_cols_to_sparse_matrix(video_user_matrix_2, columns_to_add_to_matrix_2)
+    print("Both matrices done.")
 
     return (matrix_1_with_added_cols, matrix_2_with_added_cols)
+
+
+def remove_entries_for_duplicate_user_pairs(matrix: scipy.sparse.csc_matrix | np.ndarray, 
+                                            users_1: pd.Series, 
+                                            users_2: pd.Series) -> scipy.sparse.csc_matrix | np.ndarray:
+    """
+    Takes the given matrix and the given information about which users its rows and columns
+    correspond to, and sets any entry corresponding to one user matched to themselves to zero
+
+    This is to be used for a jaccard index matrix, as we are not interested in the comparison of
+    one user to themselves, as the jaccard index will always be 1.
+
+    Args:
+        matrix: with some values (e.g. jaccard index) corresponding to pairs of users
+        users_1: Series of users corresponding to the rows of the given matrix
+        users_2: Series of users corresponding to the columns of the given matrix
+
+    Returns:
+        matrix: The matrix, but with entries where row and column correspond to the same user set to 0
+        removed_entries: The number of entries removed (set to 0)
+    """
+    removed_entries = 0
+    for i, user_1 in enumerate(users_1.values):
+        for j, user_2 in enumerate(users_2.values):
+            if user_1 == user_2:
+                removed_entries += 1
+                matrix[i, j] = 0
+    print(f"{removed_entries} overlapping users found and set to 0.")
+
+    if isinstance(matrix, scipy.sparse.csc_matrix):
+        matrix.eliminate_zeros()
+
+    return matrix, removed_entries
 
 
 def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix, 
@@ -1054,7 +1113,7 @@ def get_c_true_true(video_user_matrix: scipy.sparse.csc_matrix,
     # which are higher than the number of videos any user has commented on, and no user has 
     # commented on more than 17262 videos, in all of our clusters.
     # By using int16 instead of int, we save memory
-    # video_user_matrix = video_user_matrix.astype(np.int16)
+    video_user_matrix = video_user_matrix.astype(np.int16)
 
     if video_user_matrix_2 is None:
         return (video_user_matrix.T @ video_user_matrix).astype(np.int16)
@@ -1091,10 +1150,20 @@ def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # which are higher than the number of videos any user has commented on, and no user has 
     # commented on more than 17262 videos, in all of our clusters.
     # By using int16 instead of int, we save memory
-    # video_user_matrix = video_user_matrix.astype(np.int16)
+    video_user_matrix = video_user_matrix.astype(np.int16)
 
-    matrix_T_times_ones = video_user_matrix.T.sum(axis=1, dtype=np.int16)
+    # We use a trick here: The thing we want to calculate is X^T * (1 - Y).
+    # But if we do that directly, we need to store a matrix which is as big as Y (i.e. very big)
+    # which is full of ones, hence not sparse at all. This would take up too much memory.
+    # So instead, we calculate X^T * 1 - X^T * Y
+    # (Note that the 1 here is not the scalar 1, it is a matrix full of ones.)
+    # And, the trick is that X^T times a matrix full of ones is just the sum of each column of
+    # X^T, so we can calculate that directly instead (no need to actually generate the matrix
+    # full of ones)
+
+    matrix_T_times_ones = video_user_matrix.T.sum(axis=1, dtype=np.int16)  # Corresponds to X^T * 1
     print(f"Dtype of matrix_T_times_ones is {matrix_T_times_ones.dtype}")
+    print(f"It looks like this:\n{matrix_T_times_ones}")
 
     if video_user_matrix_2 is None:
         
@@ -1108,8 +1177,8 @@ def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix,
         raise ValueError("Given matrices don't share the same row length.")
     
     else:
-        # video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
-        result = matrix_T_times_ones - np.matmul(video_user_matrix.transpose(), video_user_matrix_2, dtype=np.int16)
+        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        result = matrix_T_times_ones - (video_user_matrix.T @ video_user_matrix_2).astype(np.int16)
         if where is None:
             return result
         else:
@@ -1145,12 +1214,16 @@ def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # which are higher than the number of videos any user has commented on, and no user has 
     # commented on more than 17262 videos, in all of our clusters.
     # By using int16 instead of int, we save memory
-    # video_user_matrix = video_user_matrix.astype(np.int16)
+    video_user_matrix = video_user_matrix.astype(np.int16)
 
     if video_user_matrix_2 is None:
         
+        # Again we use the trick of calculating 1 * X, where 1 is a matrix full of ones,
+        # without actually creating the matrix full of ones, because 1 * X is the sum of each
+        # column of X. See also the function get_c_false_true_matrix above
+
         ones_times_matrix = video_user_matrix.sum(axis=0, dtype=np.int16)
-        
+
         result = ones_times_matrix - (video_user_matrix.T @ video_user_matrix).astype(np.int16)
         
         if where is None:
@@ -1163,10 +1236,10 @@ def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     
     else:
         # convert to np.int16 again
-        # video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
+        video_user_matrix_2 = video_user_matrix_2.astype(np.int16)
         ones_times_matrix = video_user_matrix_2.sum(axis=0, dtype=np.int16)
 
-        result = ones_times_matrix - (video_user_matrix_2.T @ video_user_matrix).astype(np.int16)
+        result = ones_times_matrix - (video_user_matrix.T @ video_user_matrix_2).astype(np.int16)
 
         if where is None:
             return result
@@ -1176,7 +1249,8 @@ def get_c_true_false_matrix(video_user_matrix: scipy.sparse.csc_matrix,
 
 def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
                              video_user_matrix_2: Optional[scipy.sparse.csc_matrix] = None,
-                             precision: int = 32) -> np.array:
+                             precision: int = 32,
+                             sparse: bool = False) -> np.array:
     """
     Gets the jaccard distance, defined as (c_tt) / (c_tt + c_tf + c_ft)
     If one matrix is given, does it for all pairs of users in this matrix,
@@ -1187,6 +1261,9 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
         video_user_matrix: optional second video user matrix (eg., from another cluster)
         precision: optional specification of float precision to use for the final division.
             Default is 32
+        sparse: if True (default is False), will calculate c_tt, c_tf etc a sparse matrices.
+            Note that this only makes sense when we expect there to be many users that don't
+            have any video in common (for example when comparing two different clusters)
         
     Returns:
         Jaccard index matrix. Note that no filtering or removal of duplicate users is done here.
@@ -1197,10 +1274,16 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
         raise ValueError("Given precision must be 16 or 32")
 
     # get C_tt matrix
-    c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2)
+    if sparse:
+        c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2)
+        print("C_tt is a sparse matrix like this:")
+        print(c_tt)
+    else:
+        c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2).toarray()
     print("c_tt calculated")
 
-    c_tt_non_zero = c_tt.astype(bool).toarray()
+    if sparse:
+        c_tt_non_zero = c_tt.astype(bool).toarray()
 
     # get C_tf matrix
 
@@ -1219,7 +1302,10 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
 
     # c_tf = scipy.sparse.csc_matrix(np.multiply(c_tf ,c_tt.astype(bool).astype(np.int32).toarray()))
     # c_tf = get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
-    denominator = c_tt + get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
+    if sparse:
+        denominator = c_tt + get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
+    else:
+        denominator = c_tt + get_c_true_false_matrix(video_user_matrix, video_user_matrix_2)#, where=c_tt_non_zero)
     print("c_tf calculated")
 
     # get C_ft matrix
@@ -1231,7 +1317,10 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # remove all entries which are 0 in the C_tt matrix from the C_ft matrix, then make sparse
     # c_ft = scipy.sparse.csc_matrix(np.multiply(c_ft,c_tt.astype(bool).astype(np.int32).toarray()))
     # c_ft = get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
-    denominator += get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
+    if sparse:
+        denominator += get_c_false_true_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)    
+    else:
+        denominator += get_c_false_true_matrix(video_user_matrix, video_user_matrix_2)#, where=c_tt_non_zero)
 
     # calculate the denominator
     # print(c_tt)
@@ -1259,13 +1348,22 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # del c_tf
     # del c_ft
     print("Got all the matrices. Starting division....")
-    if precision is 32:
+    if precision == 32:
         result = np.zeros(c_tt.shape, dtype=np.float32)
-    elif precision is 16:
+    elif precision == 16:
         result = np.zeros(c_tt.shape, dtype=np.float16)
-    np.divide(c_tt.toarray(),
+
+    if sparse:
+        np.divide(c_tt.toarray(),
               denominator.toarray(),
-              where=c_tt_non_zero, out=result)
+              where=c_tt_non_zero,
+              out=result)
+    else:
+        np.divide(c_tt,#.toarray(),
+                denominator,#.toarray(),
+                #where=c_tt_non_zero,
+                out=result)
+        
     print("Division done. Result is:")
     print(result)
     return result
@@ -1290,9 +1388,123 @@ def get_mean_without_duplicates(matrix: np.ndarray) -> float:
     if matrix.shape[0] != matrix.shape[1]:
         raise ValueError("Given matrix is not square")
     
-    matrix = np.fill_diagonal(matrix, 0)
+    if matrix.dtype != np.float32:
+        matrix = matrix.astype(np.float32)
+
+    np.fill_diagonal(matrix, 0)
 
     sum_of_entries = matrix.sum(axis=None)
-    num_of_entries_without_diag = matrix.shape[0] * matrix.shape[1] - matrix.shape[0]
+    print(f"Sum of all entries without diag is {sum_of_entries}")
 
+    num_of_entries_without_diag = matrix.shape[0] * matrix.shape[1] - matrix.shape[0]
+    print(f"Numbre of entries without the diagonal is {num_of_entries_without_diag}")
     return sum_of_entries / num_of_entries_without_diag
+
+
+def get_jacc_between_same_cluster_and_get_mean(video_user_matrix: scipy.sparse.csc_matrix,
+                                               filename: str) -> float:
+    """
+    Gets jaccard index matrix between all pairs of users from one cluster, and calculates the mean
+    of the jaccard indices excluding the indices between one user with themselves.
+
+    Calculates and saves the jaccard index matrix if it doesnt exist yet
+
+    Args:
+        video_user_matrix: sparse matrix with video user data for the cluster
+        filename: filename to look for the jaccard index matrix, or to save it
+    
+    Returns:
+        mean jaccard index of the given cluster
+
+    Side effects:
+        Calculates jaccard index matrix for the given cluster if it doesn't exist yet
+    """
+
+    try: 
+        jaccard = np.load(filename)
+        print("Loaded jaccard matrix from file")
+    except FileNotFoundError:
+        jaccard = get_jaccard_index_matrix(video_user_matrix)
+
+        np.save(filename, jaccard)
+    
+    mean_jaccard = get_mean_without_duplicates(jaccard)
+    del jaccard
+    gc.collect()
+
+    return mean_jaccard
+
+
+def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix, 
+                                               matrix_2: scipy.sparse.csc_matrix, filename: str,
+                                               users_to_consider_1: pd.Series,
+                                               users_to_consider_2: pd.Series) -> float:
+    """
+    Get jaccard matrix between two different clusters, save it, and calculate the mean of the
+    entries excluding the diagonal.
+
+    Note: this function will take the two given matrices and put empty columns in them so that 
+    they share the same column. 
+    So if one matrix contains user 1 and user 3, and the other matrix conatins user 2 and user 3, 
+    then the matrices are enlarged so that both contain user 1, 2 and 3, however the first matrix
+    will have zeros for user 2, and the second matrix will have zeros for user 1.
+
+    The reason for this is that then, all values for one user with themselves are on the diagonal,
+    so that we can exclude them (because that will always have jaccard index 1).
+    
+    Args:
+        matrix_1: the video user matrix for the first cluster
+        matrix_2: the video user matrix for the second cluster
+        users_to_consider_1: the authors contained in the first cluster (with original user ids)
+        users_to_consider_2: the authors contained in the second cluster (with original user ids)
+
+    Returns:
+        Mean of the jaccard index for all pairs of users from the two clusters, excluding pairs of
+        the same user
+
+    Side effects:
+        Calculates the jaccard matrix for these clusters and saves it, if not already existing.
+    """
+
+    try:  # try to load the jaccard matrix
+        jaccard_with_duplicates = np.load(filename)
+        print("Jaccard matrix loaded from file" + filename)
+    except FileNotFoundError:  # otherwise, generate it
+
+        # # add empty columns to the matrices, so that the same column in both matrices also corresponds
+        # # to the same user
+        # print("Getting the matrices with added empty columns....")
+        # (matrix_1_w_empty_cols, 
+        #  matrix_2_with_empty_cols) = dp.get_video_user_matrices_with_equal_columns(matrix_1, matrix_2, 
+        #                                                                            users_to_consider_1, 
+        #                                                                            users_to_consider_2)
+        # print("Done.")
+        # generate jaccard index matrix for these matrices
+        # (Note that sparse is True, because many columns are 0, because of the step above)
+        print("Getting jaccard index matrices for these matrices....")
+        # jaccard = dp.get_jaccard_index_matrix(matrix_1_w_empty_cols, matrix_2_with_empty_cols,
+        #                                       sparse=True)
+        jaccard_with_duplicates = get_jaccard_index_matrix(matrix_1, matrix_2)
+        print("Done.")
+
+        # save the file
+        print("Saving the file....")
+        np.save(filename, jaccard_with_duplicates)
+        print("Done.")
+    
+    # Remove all entries of the jaccard matrix where the row and column correspond to the same user
+    print("Removing entries corresponding to pairs of the same user....")
+    jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
+        jaccard_with_duplicates, 
+        users_to_consider_1,
+        users_to_consider_2)
+    del jaccard_with_duplicates
+    print("Done.")
+    # calculate the mean of the jaccard indices, excluding the diagonal
+    print("Calculating the mean of the jaccard index matrix....")
+    mean_jaccard = jaccard_without_duplicates.sum(axis=None) / (jaccard_without_duplicates.size 
+                                                                - removed_entries)
+    print("Done.")
+    del jaccard_without_duplicates
+    gc.collect()
+    return mean_jaccard
