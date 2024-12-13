@@ -1434,6 +1434,31 @@ def get_jacc_between_same_cluster_and_get_mean(video_user_matrix: scipy.sparse.c
 
     return mean_jaccard
 
+def get_mean_jacc(video_user_matrix: scipy.sparse.csc_matrix) -> float:
+    """
+    Gets jaccard index matrix between all pairs of users from one cluster, and calculates the mean
+    of the jaccard indices excluding the indices between one user with themselves.
+
+    Calculates and saves the jaccard index matrix if it doesnt exist yet
+
+    Args:
+        video_user_matrix: sparse matrix with video user data for the cluster
+        filename: filename to look for the jaccard index matrix, or to save it
+    
+    Returns:
+        mean jaccard index of the given cluster
+
+    Side effects:
+        Calculates jaccard index matrix for the given cluster if it doesn't exist yet
+    """
+    
+    jaccard = get_jaccard_index_matrix(video_user_matrix)
+    
+    mean_jaccard = get_mean_without_duplicates(jaccard)
+    del jaccard
+    gc.collect()
+
+    return mean_jaccard
 
 def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix, 
                                                matrix_2: scipy.sparse.csc_matrix, filename: str,
