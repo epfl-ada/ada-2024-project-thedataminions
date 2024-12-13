@@ -1533,3 +1533,70 @@ def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix
     del jaccard_without_duplicates
     gc.collect()
     return mean_jaccard
+
+
+def get_jacc_mean_between_two_clusters(matrix_1: scipy.sparse.csc_matrix, 
+                                               matrix_2: scipy.sparse.csc_matrix,
+                                               users_to_consider_1: pd.Series,
+                                               users_to_consider_2: pd.Series) -> float:
+    """
+    Get jaccard matrix between two different clusters, save it, and calculate the mean of the
+    entries excluding the diagonal.
+
+    Note: this function will take the two given matrices and put empty columns in them so that 
+    they share the same column. 
+    So if one matrix contains user 1 and user 3, and the other matrix conatins user 2 and user 3, 
+    then the matrices are enlarged so that both contain user 1, 2 and 3, however the first matrix
+    will have zeros for user 2, and the second matrix will have zeros for user 1.
+
+    The reason for this is that then, all values for one user with themselves are on the diagonal,
+    so that we can exclude them (because that will always have jaccard index 1).
+    
+    Args:
+        matrix_1: the video user matrix for the first cluster
+        matrix_2: the video user matrix for the second cluster
+        users_to_consider_1: the authors contained in the first cluster (with original user ids)
+        users_to_consider_2: the authors contained in the second cluster (with original user ids)
+
+    Returns:
+        Mean of the jaccard index for all pairs of users from the two clusters, excluding pairs of
+        the same user
+
+    Side effects:
+        Calculates the jaccard matrix for these clusters and saves it, if not already existing.
+    """
+
+
+    # # add empty columns to the matrices, so that the same column in both matrices also corresponds
+    # # to the same user
+    # print("Getting the matrices with added empty columns....")
+    # (matrix_1_w_empty_cols, 
+    #  matrix_2_with_empty_cols) = dp.get_video_user_matrices_with_equal_columns(matrix_1, matrix_2, 
+    #                                                                            users_to_consider_1, 
+    #                                                                            users_to_consider_2)
+    # print("Done.")
+    # generate jaccard index matrix for these matrices
+    # (Note that sparse is True, because many columns are 0, because of the step above)
+        
+    # jaccard = dp.get_jaccard_index_matrix(matrix_1_w_empty_cols, matrix_2_with_empty_cols,
+    #                                       sparse=True)
+    jaccard_with_duplicates = get_jaccard_index_matrix(matrix_1, matrix_2)
+    print("Done.")
+
+    
+    # Remove all entries of the jaccard matrix where the row and column correspond to the same user
+    print("Removing entries corresponding to pairs of the same user....")
+    jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
+        jaccard_with_duplicates, 
+        users_to_consider_1,
+        users_to_consider_2)
+    del jaccard_with_duplicates
+    print("Done.")
+    # calculate the mean of the jaccard indices, excluding the diagonal
+    print("Calculating the mean of the jaccard index matrix....")
+    mean_jaccard = jaccard_without_duplicates.sum(axis=None) / (jaccard_without_duplicates.size 
+                                                                - removed_entries)
+    print("Done.")
+    del jaccard_without_duplicates
+    gc.collect()
+    return mean_jaccard
