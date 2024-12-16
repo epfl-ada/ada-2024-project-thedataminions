@@ -2055,3 +2055,63 @@ def get_jacc_mean_between_two_clusters(matrix_1: scipy.sparse.csc_matrix,
     del jaccard_without_duplicates
     gc.collect()
     return mean_jaccard
+
+
+def percentage_users(sparse_matrix):
+    """
+    Get the percentage of users in a certain bubble that have commented under a specific video. 
+    I.e. for each video, compute the perentage of users that have commented under it, divided by the total number of users withiin the bubble.
+
+
+    
+    Args:
+        matrix: the video user matrix for the bubble you want to compute the percentage
+
+    Returns:
+        An array of percentage for each video 
+
+    
+    """
+    row_percentage = sparse_matrix.sum(axis=1).A1 / sparse_matrix.shape[1]  
+    return row_percentage
+
+
+
+def word_interest(sparse_matrix, percentage, videos_new_pol:pd, word_interest:str, map ):
+     """
+    Find a word of interest in the title of the videos that a certain pourcentage of users has commented at (above acertain thresold).
+    If a video has more than a certain thresold of its users that has commented under this video, then it is retrieving the title and looking for a specific word.
+    The goal is to see if most of the videos as a specific subject (word) in common. 
+    
+    Args:
+        sparse_matrix: the video user matrix for the bubble you want 
+        percentage: percentage array of the sparse matrix, compute with percentage_users()
+        videos_new_pol : dataframe of all the videos in news and politics and categories, need to be load previously from the csv file
+        word of interest: word you want to look at within the videos
+        map: the mapping you want to apply 
+
+    Returns:
+    The number of videos with the word of interest
+    The dataframe with all the videos above the percentage with the word of interest, for more analysis purpose
+    """
+    #retrieve videos where at list one users in the cluser as commented under
+     mask = percentage > 0
+     sub_news_pol = videos_new_pol[mask]
+
+    #filtered video that contain word of interest, with at least one user on the cluster that has commented under it
+     filtered_df = sub_news_pol[sub_news_pol['title'].str.contains(word_interest, case=False, na=False)]
+
+    #mapping users back to sparse matrix 
+     video_ids_news_pol_int_mapping_new = map.loc[filtered_df.display_id]
+
+    #looking for sparse matrix row we're interested in
+     specific_rows = sparse_matrix[video_ids_news_pol_int_mapping_new.values, :]
+     non_zero_columns = specific_rows.getnnz(axis=0) > 0  
+
+     columns_with_non_zero_values = np.where(non_zero_columns)[0]
+
+     number_colum = len(columns_with_non_zero_values)
+     total_number_user = sparse_matrix.shape[1]
+     percentage_total = number_colum/total_number_user
+
+     return filtered_df, number_colum, total_number_user, percentage_total
