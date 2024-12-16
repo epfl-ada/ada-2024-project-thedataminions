@@ -1,11 +1,15 @@
 """Functions for processing (big) datasets. Will be called from the notebook"""
 import time
 import pandas as pd
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, List
 import gc
 import os
+from math import floor
 import numpy as np
 import scipy.sparse
+import matplotlib.pyplot as plt
+from matplotlib import colormaps
+import seaborn as sns
 
 def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
                                          save: Optional[str] = None, 
@@ -1053,10 +1057,12 @@ def get_video_user_matrices_with_equal_columns(video_user_matrix_1: scipy.sparse
 
 def remove_entries_for_duplicate_user_pairs(matrix: scipy.sparse.csc_matrix | np.ndarray, 
                                             users_1: pd.Series, 
-                                            users_2: pd.Series) -> scipy.sparse.csc_matrix | np.ndarray:
+                                            users_2: pd.Series,
+                                            nan_instead: Optional[bool] = False) -> scipy.sparse.csc_matrix | np.ndarray:
     """
     Takes the given matrix and the given information about which users its rows and columns
-    correspond to, and sets any entry corresponding to one user matched to themselves to zero
+    correspond to, and sets any entry corresponding to one user matched to themselves to zero (or np.nan,
+    if nan_instead=True)
 
     This is to be used for a jaccard index matrix, as we are not interested in the comparison of
     one user to themselves, as the jaccard index will always be 1.
@@ -1065,18 +1071,22 @@ def remove_entries_for_duplicate_user_pairs(matrix: scipy.sparse.csc_matrix | np
         matrix: with some values (e.g. jaccard index) corresponding to pairs of users
         users_1: Series of users corresponding to the rows of the given matrix
         users_2: Series of users corresponding to the columns of the given matrix
+        nan_instead: if True (default False), will not set to zero but instead set to np.nan
 
     Returns:
         matrix: The matrix, but with entries where row and column correspond to the same user set to 0
-        removed_entries: The number of entries removed (set to 0)
+        removed_entries: The number of entries removed (set to 0, or np.nan if nan_instead=True)
     """
     removed_entries = 0
     for i, user_1 in enumerate(users_1.values):
         for j, user_2 in enumerate(users_2.values):
             if user_1 == user_2:
                 removed_entries += 1
-                matrix[i, j] = 0
-    print(f"{removed_entries} overlapping users found and set to 0.")
+                if nan_instead:
+                    matrix[i, j] = np.nan
+                else:
+                    matrix[i, j] = 0
+    print(f"{removed_entries} overlapping users found and set to 0 or np.nan.")
 
     if isinstance(matrix, scipy.sparse.csc_matrix):
         matrix.eliminate_zeros()
@@ -1391,14 +1401,42 @@ def get_mean_without_duplicates(matrix: np.ndarray) -> float:
     if matrix.dtype != np.float32:
         matrix = matrix.astype(np.float32)
 
-    np.fill_diagonal(matrix, 0)
+    np.fill_diagonal(matrix, np.nan)
 
-    sum_of_entries = matrix.sum(axis=None)
-    print(f"Sum of all entries without diag is {sum_of_entries}")
+    return np.nanmean(matrix)
+    # sum_of_entries = matrix.sum(axis=None)
+    # print(f"Sum of all entries without diag is {sum_of_entries}")
 
-    num_of_entries_without_diag = matrix.shape[0] * matrix.shape[1] - matrix.shape[0]
-    print(f"Numbre of entries without the diagonal is {num_of_entries_without_diag}")
-    return sum_of_entries / num_of_entries_without_diag
+    # num_of_entries_without_diag = matrix.shape[0] * matrix.shape[1] - matrix.shape[0]
+    # print(f"Numbre of entries without the diagonal is {num_of_entries_without_diag}")
+    # return sum_of_entries / num_of_entries_without_diag
+
+
+def get_median_without_duplicates(matrix: np.ndarray) -> float:
+    """
+    Takes the median of all values of a matrix, but ignores the values on the diagonal.
+    The assumtion is that on the diagonal, we are comparing one user to themselves,
+    which is not a relevant metric.
+    
+    Args:
+        matrix: a sparse square matrix with distance values, e.g. jaccard distance, for all pairs
+            of users.
+    Returns:
+        mean of all values excluding the original
+    
+    Raises:
+        ValueError: if given matrix is not square
+    """
+
+    if matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("Given matrix is not square")
+    
+    if matrix.dtype != np.float32:
+        matrix = matrix.astype(np.float32)
+
+    np.fill_diagonal(matrix, np.nan)
+    
+    return np.nanmedian(matrix)
 
 
 def get_jacc_between_same_cluster_and_get_mean(video_user_matrix: scipy.sparse.csc_matrix,
@@ -1420,22 +1458,62 @@ def get_jacc_between_same_cluster_and_get_mean(video_user_matrix: scipy.sparse.c
         Calculates jaccard index matrix for the given cluster if it doesn't exist yet
     """
 
-    try: 
+    try:
         jaccard = np.load(filename)
-        print("Loaded jaccard matrix from file")
+        print("    Loaded jaccard index matrix from file")
     except FileNotFoundError:
+        print("    Jaccard index matrix does not exist yet, generating....")
         jaccard = get_jaccard_index_matrix(video_user_matrix)
-
+        print("    Done.")
         np.save(filename, jaccard)
-    
+
+    print("    Calculating mean of jaccard index matrix, excluding the diagonal....")
     mean_jaccard = get_mean_without_duplicates(jaccard)
+    print("    Done.")
     del jaccard
     gc.collect()
 
     return mean_jaccard
 
 
-def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix, 
+def get_jacc_between_same_cluster_and_get_median(video_user_matrix: scipy.sparse.csc_matrix,
+                                                 filename: str) -> float:
+    """
+    Gets jaccard index matrix between all pairs of users from one cluster, and calculates the median
+    of the jaccard indices excluding the indices between one user with themselves.
+
+    Calculates and saves the jaccard index matrix if it doesnt exist yet
+
+    Args:
+        video_user_matrix: sparse matrix with video user data for the cluster
+        filename: filename to look for the jaccard index matrix, or to save it
+    
+    Returns:
+        median jaccard index of the given cluster
+
+    Side effects:
+        Calculates jaccard index matrix for the given cluster if it doesn't exist yet
+    """
+
+    try:
+        jaccard = np.load(filename)
+        print("    Loaded jaccard index matrix from file")
+    except FileNotFoundError:
+        print("    Jaccard index matrix does not exist yet, generating....")
+        jaccard = get_jaccard_index_matrix(video_user_matrix)
+        print("    Done.")
+        np.save(filename, jaccard)
+
+    print("    Calculating median of jaccard index matrix, excluding the diagonal....")
+    mean_jaccard = get_median_without_duplicates(jaccard)
+    print("    Done.")
+    del jaccard
+    gc.collect()
+
+    return mean_jaccard
+
+
+def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix,
                                                matrix_2: scipy.sparse.csc_matrix, filename: str,
                                                users_to_consider_1: pd.Series,
                                                users_to_consider_2: pd.Series) -> float:
@@ -1468,7 +1546,7 @@ def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix
 
     try:  # try to load the jaccard matrix
         jaccard_with_duplicates = np.load(filename)
-        print("Jaccard matrix loaded from file" + filename)
+        print("    Loaded jaccard index matrix from file")
     except FileNotFoundError:  # otherwise, generate it
 
         # # add empty columns to the matrices, so that the same column in both matrices also corresponds
@@ -1481,30 +1559,406 @@ def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix
         # print("Done.")
         # generate jaccard index matrix for these matrices
         # (Note that sparse is True, because many columns are 0, because of the step above)
-        print("Getting jaccard index matrices for these matrices....")
+        print("    Jaccard index matrix does not exist yet, generating....")
         # jaccard = dp.get_jaccard_index_matrix(matrix_1_w_empty_cols, matrix_2_with_empty_cols,
         #                                       sparse=True)
         jaccard_with_duplicates = get_jaccard_index_matrix(matrix_1, matrix_2)
-        print("Done.")
+        print("    Done.")
 
         # save the file
-        print("Saving the file....")
         np.save(filename, jaccard_with_duplicates)
-        print("Done.")
     
     # Remove all entries of the jaccard matrix where the row and column correspond to the same user
-    print("Removing entries corresponding to pairs of the same user....")
+    print("    Removing entries corresponding to pairs of the same user....")
     jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
         jaccard_with_duplicates, 
         users_to_consider_1,
         users_to_consider_2)
     del jaccard_with_duplicates
-    print("Done.")
+    print("    Done.")
     # calculate the mean of the jaccard indices, excluding the diagonal
-    print("Calculating the mean of the jaccard index matrix....")
+    print("    Calculating the mean of the jaccard index matrix....")
     mean_jaccard = jaccard_without_duplicates.sum(axis=None) / (jaccard_without_duplicates.size 
                                                                 - removed_entries)
-    print("Done.")
+    print("    Done.")
     del jaccard_without_duplicates
     gc.collect()
     return mean_jaccard
+
+
+def get_jacc_between_two_clusters_and_get_median(matrix_1: scipy.sparse.csc_matrix,
+                                                 matrix_2: scipy.sparse.csc_matrix, filename: str,
+                                                 users_to_consider_1: pd.Series,
+                                                 users_to_consider_2: pd.Series) -> float:
+    """
+    Get jaccard matrix between two different clusters, save it, and calculate the median of the
+    entries excluding the diagonal.
+
+    Note: this function will take the two given matrices and put empty columns in them so that 
+    they share the same column. 
+    So if one matrix contains user 1 and user 3, and the other matrix conatins user 2 and user 3, 
+    then the matrices are enlarged so that both contain user 1, 2 and 3, however the first matrix
+    will have zeros for user 2, and the second matrix will have zeros for user 1.
+
+    The reason for this is that then, all values for one user with themselves are on the diagonal,
+    so that we can exclude them (because that will always have jaccard index 1).
+    
+    Args:
+        matrix_1: the video user matrix for the first cluster
+        matrix_2: the video user matrix for the second cluster
+        users_to_consider_1: the authors contained in the first cluster (with original user ids)
+        users_to_consider_2: the authors contained in the second cluster (with original user ids)
+
+    Returns:
+        Mean of the jaccard index for all pairs of users from the two clusters, excluding pairs of
+        the same user
+
+    Side effects:
+        Calculates the jaccard matrix for these clusters and saves it, if not already existing.
+    """
+
+    try:  # try to load the jaccard matrix
+        jaccard_with_duplicates = np.load(filename)
+        print("    Loaded jaccard index matrix from file")
+    except FileNotFoundError:  # otherwise, generate it
+
+        # # add empty columns to the matrices, so that the same column in both matrices also corresponds
+        # # to the same user
+        # print("Getting the matrices with added empty columns....")
+        # (matrix_1_w_empty_cols, 
+        #  matrix_2_with_empty_cols) = dp.get_video_user_matrices_with_equal_columns(matrix_1, matrix_2, 
+        #                                                                            users_to_consider_1, 
+        #                                                                            users_to_consider_2)
+        # print("Done.")
+        # generate jaccard index matrix for these matrices
+        # (Note that sparse is True, because many columns are 0, because of the step above)
+        print("    Jaccard index matrix does not exist yet, generating....")
+        # jaccard = dp.get_jaccard_index_matrix(matrix_1_w_empty_cols, matrix_2_with_empty_cols,
+        #                                       sparse=True)
+        jaccard_with_duplicates = get_jaccard_index_matrix(matrix_1, matrix_2)
+        print("    Done.")
+
+        # save the file
+        np.save(filename, jaccard_with_duplicates)
+    
+    # Remove all entries of the jaccard matrix where the row and column correspond to the same user
+    print("    Removing entries corresponding to pairs of the same user....")
+    jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
+        jaccard_with_duplicates, 
+        users_to_consider_1,
+        users_to_consider_2,
+        nan_instead=True)
+    
+    del jaccard_with_duplicates
+    print("    Done.")
+    # calculate the median of the jaccard indices, excluding the diagonal
+    print("    Calculating the median of the jaccard index matrix....")
+    median_jaccard = np.nanmedian(jaccard_without_duplicates)
+    print("    Done.")
+    del jaccard_without_duplicates
+    gc.collect()
+    return median_jaccard
+
+
+def get_mean_jaccard_value_table(video_author_matrices: Dict[str, scipy.sparse.csc_matrix],
+                                 users_in_clusters: Dict[str, pd.Series],
+                                 jaccard_filenames: Dict[str, str],
+                                 mean_jaccard_value_table_filename: str,
+                                 mode: str='mean') -> pd.DataFrame:
+    """
+    Assembles a table for given clusters, where the value is the mean or median jaccard index between users
+    in the two clusters.
+
+    Will calculate jaccard index matrices for the clusters if it doesn't exist yet.
+
+    Note on the dict keys: video_author_matrices and users_in_clusters must share the same keys. 
+    Furthermore, all keys of jaccard_filenames must be a combination of the keys of the other dicts, 
+    in the format "name1_name2", such as "cnn_fox" or "cnn_cnn".
+
+    Args:
+        video_author_matrices: Dict with the video_author matrices of all clusters. Will be used to
+            calculate the jaccard index matrices (Note that if the jaccard index matrices already exists,
+            the video author matrices aren't actually used, but they still have to be given here.)
+        users_in_clusters: Dict with Series containing the users contained in each cluster (i.e., this is
+            data about which user id each column in the video author matrices correspond to)
+        jaccard_filenames: Dict with filenames for the jaccard index matrices. If such a file is found, 
+            it will be used directly, if not, it will be calculated using the given video author matrices 
+            and saved under this filename. Note that this dict must contain filenames both for all 
+            jaccard matrices for one cluster with itself AND for jaccard matrices for each cluster with 
+            all other clusters.
+        mean_jaccard_value_table_filename: The mean jaccard value table will be saved here. If this file
+            already exists, raises FileExistsError
+        mode: can be "mean" (default) or "median"
+
+    Returns:
+        DataFrame with cluster names as rows and columns, and the mean or median jaccard index between users in #
+        these clusters as values
+    
+    Side effects:
+        Calculates needed jaccard matrices if these don't exist yet. Saves the mean jaccard table to csv
+    
+    Raises:
+        ValueError: If the keys in the given dicts do not have the right format (see above)
+        FileExistsError: If a file exists under the given filename for the mean jaccard table
+    """
+
+    if users_in_clusters.keys() != video_author_matrices.keys():
+        raise ValueError("Keys do not match in given dicts 'video_author_matrices' and'users_in_clusters'")
+    else:
+        for key in jaccard_filenames.keys():
+            if not np.array([key_i in users_in_clusters.keys() for key_i in key.split('_')]).all():
+                raise ValueError("Keys of given dict 'jaccard_filenames' do not match the given keys "
+                                 "in the other dicts.")
+
+    # initiate empty array
+    mean_jaccard_array = np.zeros((len(users_in_clusters), len(users_in_clusters)), dtype=np.float32)
+
+    # go through all combinations of clusters 
+    # (but skip (cluster2, cluster1) of (cluster1, cluster2) has already been calculated)
+    for i, name1 in enumerate(list(users_in_clusters.keys())):
+        for j, name2 in enumerate(list(users_in_clusters.keys())[i:]):
+
+            print(f"Getting Jaccard matrix for cluster {name1} with cluster {name2}...")
+
+            # Case 1: We are comparing a cluster to itself
+            if name1 == name2:
+                # call the corresponding function to get the mean jaccard index and save to the array
+                if mode == 'mean':
+                    mean_jaccard = get_jacc_between_same_cluster_and_get_mean(
+                        video_author_matrices[name1],
+                        jaccard_filenames[name1 + "_" + name1])
+                elif mode == 'median':
+                    mean_jaccard = get_jacc_between_same_cluster_and_get_median(
+                        video_author_matrices[name1],
+                        jaccard_filenames[name1 + "_" + name1])
+                else:
+                    raise ValueError("'mode' parameter must be either 'mean' or 'median'.")
+                
+                mean_jaccard_array[i, i] = mean_jaccard
+
+            # Case 2: We compare two different clusters to each other
+            else:
+                # call the corresponding function to get the mean jaccard index and save to the array
+                if mode == 'mean':
+                    mean_jacc = get_jacc_between_two_clusters_and_get_mean(
+                        video_author_matrices[name1],
+                        video_author_matrices[name2],
+                        filename=jaccard_filenames[name1 + "_" + name2],
+                        users_to_consider_1=users_in_clusters[name1],
+                        users_to_consider_2=users_in_clusters[name2])
+                elif mode == 'median':
+                    mean_jacc = get_jacc_between_two_clusters_and_get_median(
+                        video_author_matrices[name1],
+                        video_author_matrices[name2],
+                        filename=jaccard_filenames[name1 + "_" + name2],
+                        users_to_consider_1=users_in_clusters[name1],
+                        users_to_consider_2=users_in_clusters[name2])
+                else:
+                    raise ValueError("'mode' parameter must be either 'mean' or 'median'.")
+                
+                mean_jaccard_array[i, j+i] = mean_jacc
+            print("Done.")
+
+    # convert the array to a dataframe and label the rows and columns
+    df_mean_jaccard_values = pd.DataFrame(mean_jaccard_array, 
+                                          index=users_in_clusters.keys(),
+                                          columns=users_in_clusters.keys())
+
+    gc.collect()
+
+    # save the mean jaccard table as a csv file
+    df_mean_jaccard_values.to_csv(mean_jaccard_value_table_filename, mode='x')
+    if mode == 'mean':
+        print(f"Generated and saved mean jaccard index value table under {mean_jaccard_value_table_filename}.")
+    elif mode == 'median':
+        print(f"Generated and saved median jaccard index value table under {mean_jaccard_value_table_filename}.")
+
+    return df_mean_jaccard_values
+
+
+def plot_histograms_of_jaccard_indices_from_matrix(jaccard_index_matrix: np.ndarray,
+                                                   fig_linlog_filepath: str,
+                                                   fig_loglog_filepath: str,
+                                                   color: str,
+                                                   cluster_name_1: str,
+                                                   cluster_name_2: Optional[str] = None,
+                                                   users_in_rows: Optional[pd.Series] = None,
+                                                   users_in_cols: Optional[pd.Series] = None,
+                                                   show: bool = True):  # add filepath thing here, then try the function on something, then stop for today
+    """
+    Plots histograms displaying the distribution of jaccard indices for all pairs in a jaccard index matrix.
+
+    Once a lin-log plot, and one a log-log plot. Saving to file is mandatory, showing the plot is optional.
+
+    Args:
+        jaccard_index_matrix: A matrix with all jaccard indices
+        fig_linlog_filepath: filepath where the lin log plot is saved
+        fig_loglog_filepath: filepath where the log log plot is saved
+        color: color of the graphs
+        cluster_name_1: name of the first, or only cluster which the given jaccard matrix describes
+        cluster_name_2: optional name of the second cluster which the given jaccard matrix describes
+        users_in_rows: optional list of user ids corresponding to the rows in the given jaccard matrix.
+            Only required when the jaccard matrix describes two different clusters
+        users in cols: the same but for the user ids corresponding to the columns in the given jaccard matrix
+        show: if True (default), will show the plot. Otherwise it is only saved
+    
+    """
+
+    print("Jaccard index matrix loaded.")
+    print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
+    jaccard_index_matrix = jaccard_index_matrix.astype(np.float16)
+    print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
+    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+        
+        for i in range(jaccard_index_matrix.shape[0]):
+            jaccard_index_matrix[i, i:] = np.nan  # set everything in upper tri including diagonal to nan
+            # this excludes for example the pair (user 1, user 1) and the pair (user 2, user 1) when 
+            # the pair (user 1, user 2) has already been considered.
+        
+        values_in_non_duplicate_entries_of_jaccard_matrix = jaccard_index_matrix.flatten()
+        
+    
+    else:
+        jaccard_index_matrix = jaccard_index_matrix.flatten()
+        
+        for i, user1 in enumerate(users_in_rows.to_list()):
+            for j, user2 in enumerate(users_in_cols.to_list()):
+                if user1 == user2:
+                    # set entries corresponding to the same user to nan
+                    jaccard_index_matrix[i*len(users_in_cols) + j] = np.nan
+                    
+        values_in_non_duplicate_entries_of_jaccard_matrix = jaccard_index_matrix
+        
+
+    fig_linlog = plt.figure(figsize=(10, 6))
+    values_array = plt.hist(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7,
+                            color=color, log=True, bins=100)
+    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
+    else:
+        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
+    plt.xlabel('Jaccard index')
+    # plt.ylim(0, ylim)
+    plt.ylabel('Number of Pairs')
+    plt.grid(True)
+    plt.tight_layout()
+    
+
+    plt.savefig(fig_linlog_filepath)
+
+    if show:
+        plt.show()
+    
+    del fig_linlog
+    print(gc.collect())
+
+    fig_loglog = plt.figure(figsize=(10,6))
+    
+    
+    plt.loglog(values_array[1][1:], values_array[0], color=color)
+
+    # sns.histplot(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7, color=color, log=(True, True), bins=100)
+    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
+    else:
+        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
+    plt.xlabel('Jaccard index')
+    # plt.ylim(0, ylim)
+    plt.ylabel('Number of Pairs')
+    plt.grid(True)
+    plt.tight_layout()
+    
+    plt.savefig(fig_loglog_filepath)
+    if show:
+        plt.show()
+
+    
+    del fig_loglog
+    print(gc.collect())
+
+
+def create_jaccard_index_histograms_for_all_cluster_combinations(
+        video_author_matrices: Dict[str, scipy.sparse.csc_matrix],
+        users_in_clusters: Dict[str, pd.Series],
+        jaccard_filenames: Dict[str, str],
+        base_filename: str,
+        show: bool | List[bool] = False) -> pd.DataFrame:
+    """
+    Creates histograms for the jaccard indics for all possible combinations of clusters given.
+
+    Will calculate jaccard index matrices for the clusters if it doesn't exist yet.
+
+    Note on the dict keys: video_author_matrices and users_in_clusters must share the same keys. 
+    Furthermore, all keys of jaccard_filenames must be a combination of the keys of the other dicts, 
+    in the format "name1_name2", such as "cnn_fox" or "cnn_cnn".
+
+    Args:
+        video_author_matrices: Dict with the video_author matrices of all clusters. Will be used to
+            calculate the jaccard index matrices (Note that if the jaccard index matrices already exists,
+            the video author matrices aren't actually used, but they still have to be given here.)
+        users_in_clusters: Dict with Series containing the users contained in each cluster (i.e., this is
+            data about which user id each column in the video author matrices correspond to)
+        jaccard_filenames: Dict with filenames for the jaccard index matrices. If such a file is found, 
+            it will be used directly, if not, it will be calculated using the given video author matrices 
+            and saved under this filename. Note that this dict must contain filenames both for all 
+            jaccard matrices for one cluster with itself AND for jaccard matrices for each cluster with 
+            all other clusters.
+        base_filename: path and common part of the filenames of the plots. The plots will be saved under
+            base_filename + name1 + name2 + .png            
+        show: either a single boolean value or a list of bools. If ith value is True, displays the ith plot. 
+            If True for all, will result in very many plots shown. Default is False
+
+    Returns:
+        DataFrame with cluster names as rows and columns, and the mean jaccard index between users in #
+        these clusters as values
+    
+    Side effects:
+        Calculates needed jaccard matrices if these don't exist yet. Saves the mean jaccard table to csv
+    
+    Raises:
+        ValueError: If the keys in the given dicts do not have the right format (see above)
+        FileExistsError: If a file exists under the given filename for the mean jaccard table
+    """
+    if users_in_clusters.keys() != video_author_matrices.keys():
+        raise ValueError("Keys do not match in given dicts 'video_author_matrices' and'users_in_clusters'")
+    else:
+        for key in jaccard_filenames.keys():
+            if not np.array([key_i in users_in_clusters.keys() for key_i in key.split('_')]).all():
+                raise ValueError("Keys of given dict 'jaccard_filenames' do not match the given keys "
+                                 "in the other dicts.")
+
+    # load colormap
+    cmap = colormaps['Set3']
+
+    # go through all combinations of clusters 
+    # (but skip (cluster2, cluster1) of (cluster1, cluster2) has already been calculated)
+    for i, name1 in enumerate(list(users_in_clusters.keys())):
+        for j, name2 in enumerate(list(users_in_clusters.keys())[i:]):
+
+            print(f"Getting Jaccard index histograms for cluster {name1} with cluster {name2}...")
+            
+            if isinstance(show, List):
+                show_this_plot = show[i*len(users_in_clusters)+j]
+            else:
+                show_this_plot = show
+
+            if (os.path.isfile(base_filename + name1 + '_' + name2 + '_linlog.png') 
+                and os.path.isfile(base_filename  + name1 + '_' + name2 + '_loglog.png')):
+                print("Plots are already existing, skipping...")
+                continue
+
+            plot_histograms_of_jaccard_indices_from_matrix(jaccard_index_matrix=np.load(jaccard_filenames[name1 + "_" + name2]),
+                                                           fig_linlog_filepath=base_filename + name1 + '_' + name2 + '_linlog.png',
+                                                           fig_loglog_filepath=base_filename  + name1 + '_' + name2 + '_loglog.png',
+                                                           color=cmap(i*len(users_in_clusters)+j),
+                                                           cluster_name_1=name1,
+                                                           cluster_name_2=name2,
+                                                           users_in_rows=users_in_clusters[name1],
+                                                           users_in_cols=users_in_clusters[name2],
+                                                           show=show_this_plot)
+            
+            print("Done.")
+
+    print(f"Saved plots under file starting with {base_filename}.")
+    gc.collect()
+
