@@ -661,6 +661,118 @@ def clean (df, save):
 
     if save==False:
         return df.replace('', np.nan).dropna()
+    
+
+
+def filter_channel_data(dataset_root_path, df_videos_news_pol_manually_selected, channel_id, channel_name, filename_suffix):
+    """
+    filter videos for a specific channel.
+    
+    Args:
+    - dataset_root_path (str): Path to the dataset root directory.
+    - df_videos_news_pol_manually_selected (DataFrame): The manually selected videos dataframe.
+    - channel_id (str): The channel ID 
+    - channel_name (str): The name of the channel to be used in the CSV filename.
+    - filename_suffix (str): The suffix for the output file name.
+    
+    Returns:
+    - DataFrame: The filtered videos dataframe for the specified channel.
+    """
+    file_path = dataset_root_path + f"../generated_data/videos_news_pol_{filename_suffix}.csv"
+    
+    try: # ... try to load the data from file
+        df_channel = pd.read_csv(file_path)
+        print(f"Data for {channel_name} read from file.")
+    except FileNotFoundError: # otherwise, generate it and save
+        df_channel = df_videos_news_pol_manually_selected.loc[
+            df_videos_news_pol_manually_selected.channel_id == channel_id]
+        df_channel.to_csv(file_path, index=False)
+        print(f"Data for {channel_name} filtered and saved.")
+    
+    return df_channel
+
+
+def plot_dist_comment(comment_counts, channel_name, color):
+    """
+    Plot distribution of the comments
+
+    Args:
+        comments_counts: number of comments
+        channel_name: name of channel you're interested in 
+        color: color of your histogram 
+
+    """
+    plt.figure(figsize=(15, 6))
+    plt.plot(comment_counts.index, comment_counts, marker='o', color=color, alpha=0.7)  
+    plt.title(f'Number of Comments per Author in {channel_name} channel')  
+    plt.xlabel('Author id') 
+    plt.ylabel('Number of Comments')  
+    plt.xticks(rotation=45, ha='right') 
+    plt.grid(True)  
+    plt.tight_layout() 
+    plt.show() 
+
+
+def plot_histo(comment_counts, channel_name, color, ylim):
+    """
+    Plot histogram in normal scale
+
+    Args:
+        comments_counts: number of comments
+        channel_name: name of channel you're interested in 
+        color: color of your histogram 
+        ylim: y limit you want to set
+
+    """
+    bins = range(0, comment_counts.max() + 10, 10)  # Create bins from 0 to max comments in steps of 10
+    bin_labels = [f'{i}-{i+9}' for i in bins[:-1]]  # Labels like '0-10', '10-20', etc.
+
+    # Use pd.cut to bin the comment counts 
+    comment_counts_binned = pd.cut(comment_counts, bins=bins, labels=bin_labels, right=False)
+    authors_per_bin = comment_counts_binned.value_counts().sort_index()
+    authors_per_bin = authors_per_bin.reset_index()
+    authors_per_bin.columns = ['Comment Range', 'Number of Authors']
+
+    # Plot the histogram
+    plt.figure(figsize=(10, 6))
+    plt.hist(comment_counts, bins=bins, alpha=0.7, color=color)
+    plt.title(f'Distribution of Comments per Author ({channel_name})')
+    plt.xlabel('Number of Comments')
+    plt.ylim(0, ylim)
+    plt.ylabel('Number of Authors')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+def plot_log_histo(comment_counts, channel_name, color):
+    """
+    Plot histogram in log-log scale
+
+    Args:
+        comments_counts: number of comments
+        channel_name: name of channel you're interested in 
+        color: color of your histogram 
+
+    """
+    log_bins = np.logspace(np.log10(1), np.log10(comment_counts.max()), num=20)    
+    bin_labels = [f'{int(log_bins[i])}-{int(log_bins[i+1])}' for i in range(len(log_bins)-1)] 
+
+    comment_counts_binned = pd.cut(comment_counts, bins=log_bins, labels=bin_labels, right=False)
+    authors_per_bin = comment_counts_binned.value_counts().sort_index()
+    authors_per_bin = authors_per_bin.reset_index()
+    authors_per_bin.columns = ['Comment Range', 'Number of Authors']
+
+    # Plot the histogram
+    plt.figure(figsize=(10, 6))
+    plt.hist(comment_counts, bins=log_bins, alpha=0.7, color=color)
+    plt.xscale('log')  
+    plt.yscale('log') 
+    plt.title(f'Distribution of Comments per Author ({channel_name})')
+    plt.xlabel('Number of Comments')
+    plt.ylabel('Number of Authors')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 
 def common_commented_videos(matrix, user_i: int, user_j: int):
