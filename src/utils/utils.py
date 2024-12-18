@@ -1829,6 +1829,141 @@ def plot_histograms_of_jaccard_indices_from_matrix(jaccard_index_matrix: np.ndar
     
     """
 
+    # print("Jaccard index matrix loaded.")
+    # print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
+    # jaccard_index_matrix = jaccard_index_matrix.astype(np.float16)
+    # print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
+    # if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+        
+    #     for i in range(jaccard_index_matrix.shape[0]):
+    #         jaccard_index_matrix[i, i:] = np.nan  # set everything in upper tri including diagonal to nan
+    #         # this excludes for example the pair (user 1, user 1) and the pair (user 2, user 1) when 
+    #         # the pair (user 1, user 2) has already been considered.
+        
+    #     values_in_non_duplicate_entries_of_jaccard_matrix = jaccard_index_matrix.flatten()
+        
+    
+    # else:
+    #     jaccard_index_matrix = jaccard_index_matrix.flatten()
+        
+    #     for i, user1 in enumerate(users_in_rows.to_list()):
+    #         for j, user2 in enumerate(users_in_cols.to_list()):
+    #             if user1 == user2:
+    #                 # set entries corresponding to the same user to nan
+    #                 jaccard_index_matrix[i*len(users_in_cols) + j] = np.nan
+                    
+    #     values_in_non_duplicate_entries_of_jaccard_matrix = jaccard_index_matrix
+        
+
+    fig_linlog, ax_linlog = plt.subplots(figsize=(10, 6))
+
+    # values_array = plt.hist(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7,
+    #                         color=color, log=True, bins=100)
+    
+    
+    fig_loglog, ax_loglog = plt.subplots(figsize=(10,6))
+
+    plot_histograms_of_jaccard_indices_from_matrix_to_ax(jaccard_index_matrix, color,
+                                                         cluster_name_1, cluster_name_2,
+                                                         users_in_rows, users_in_cols,
+                                                         ax_linlog=ax_linlog,
+                                                         ax_loglog=ax_loglog)
+
+    # plt.savefig(fig_linlog_filepath)
+
+    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+        ax_linlog.set_title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
+    else:
+        ax_linlog.set_title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
+    ax_linlog.set_xlabel('Jaccard index')
+    # plt.ylim(0, ylim)
+    ax_linlog.set_ylabel('Number of Pairs')
+    ax_linlog.grid(True)
+    fig_linlog.tight_layout()
+
+    if show:
+        fig_linlog.show()
+
+    fig_linlog.savefig(fig_linlog_filepath)
+
+    del fig_linlog
+    gc.collect()
+    
+    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+        ax_loglog.set_title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
+    else:
+        ax_loglog.set_title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
+    ax_loglog.set_xlabel('Jaccard index')
+    # plt.ylim(0, ylim)
+    ax_loglog.set_ylabel('Number of Pairs')
+    ax_loglog.grid(True)
+    fig_loglog.tight_layout()
+    
+    if show:
+        fig_loglog.show()
+
+    fig_loglog.savefig(fig_loglog_filepath)
+
+    del fig_loglog
+    gc.collect()
+
+    # fig_loglog = plt.figure(figsize=(10,6))
+    
+    
+    # plt.loglog(values_array[1][1:], values_array[0], color=color)
+
+    # # sns.histplot(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7, color=color, log=(True, True), bins=100)
+    # if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
+    #     plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
+    # else:
+    #     plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
+    # plt.xlabel('Jaccard index')
+    # # plt.ylim(0, ylim)
+    # plt.ylabel('Number of Pairs')
+    # plt.grid(True)
+    # plt.tight_layout()
+    
+    # plt.savefig(fig_loglog_filepath)
+    # if show:
+    #     plt.show()
+
+    
+    # del fig_loglog
+    # print(gc.collect())
+
+
+def plot_histograms_of_jaccard_indices_from_matrix_to_ax(
+        jaccard_index_matrix: np.ndarray,
+        color: str,
+        cluster_name_1: str,
+        cluster_name_2: Optional[str] = None,
+        users_in_rows: Optional[pd.Series] = None,
+        users_in_cols: Optional[pd.Series] = None,
+        ax_linlog: Optional[plt.Axes] = None,
+        ax_loglog: Optional[plt.Axes] = None):
+    """
+    Plots histograms displaying the distribution of jaccard indices for all pairs in a jaccard index matrix.
+
+    Once a lin-log plot, and one a log-log plot. Saving to file is mandatory, showing the plot is optional.
+
+    Args:
+        jaccard_index_matrix: A matrix with all jaccard indices
+        color: color of the graphs
+        cluster_name_1: name of the first, or only cluster which the given jaccard matrix describes
+        cluster_name_2: optional name of the second cluster which the given jaccard matrix describes
+        users_in_rows: optional list of user ids corresponding to the rows in the given jaccard matrix.
+            Only required when the jaccard matrix describes two different clusters
+        users in cols: the same but for the user ids corresponding to the columns in the given jaccard matrix
+        ax_linlog: axis where to plot the linlog plot. Optional, but if not given, an axis
+            for a loglog plot must be given
+        ax_loglog: axis where to plot the loglog plot. Optional, but if not given, an axis
+            for a linlog plot must be given
+    
+    """
+    
+    if ax_loglog is None and ax_linlog is None:
+        raise ValueError("At least one axis must be given.")
+    
     print("Jaccard index matrix loaded.")
     print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
     jaccard_index_matrix = jaccard_index_matrix.astype(np.float16)
@@ -1854,52 +1989,124 @@ def plot_histograms_of_jaccard_indices_from_matrix(jaccard_index_matrix: np.ndar
                     
         values_in_non_duplicate_entries_of_jaccard_matrix = jaccard_index_matrix
         
+    if ax_linlog is None:
+        fig_linlog = plt.figure(figsize=(10, 6))
+        values_array = plt.hist(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7,
+                                color=color, log=True, bins=100)
+        del fig_linlog
+        gc.collect()
 
-    fig_linlog = plt.figure(figsize=(10, 6))
-    values_array = plt.hist(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7,
-                            color=color, log=True, bins=100)
-    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
-        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
     else:
-        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
-    plt.xlabel('Jaccard index')
-    # plt.ylim(0, ylim)
-    plt.ylabel('Number of Pairs')
-    plt.grid(True)
-    plt.tight_layout()
+        if cluster_name_2 is not None:
+            values_array = ax_linlog.hist(values_in_non_duplicate_entries_of_jaccard_matrix,
+                                        alpha=0.7, color=color, log=True, bins=100,
+                                        label=f"{cluster_name_1} - {cluster_name_2}")
+        else:
+            values_array = ax_linlog.hist(values_in_non_duplicate_entries_of_jaccard_matrix,
+                                      alpha=0.7, color=color, log=True, bins=100,
+                                      label=f"{cluster_name_1}")
     
+    if ax_loglog is not None:
+        if cluster_name_2 is not None:
+            ax_loglog.loglog(values_array[1][1:], values_array[0], color=color, label=f"{cluster_name_1} - {cluster_name_2}")
+        else:
+            ax_loglog.loglog(values_array[1][1:], values_array[0], color=color, label=f"{cluster_name_1}")
 
-    plt.savefig(fig_linlog_filepath)
 
-    if show:
-        plt.show()
-    
-    del fig_linlog
-    print(gc.collect())
-
-    fig_loglog = plt.figure(figsize=(10,6))
-    
-    
-    plt.loglog(values_array[1][1:], values_array[0], color=color)
-
-    # sns.histplot(values_in_non_duplicate_entries_of_jaccard_matrix, alpha=0.7, color=color, log=(True, True), bins=100)
-    if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
-        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1}')
+def make_subplot_grid_with_jaccard_index_histograms(
+        video_author_matrices: Dict[str, scipy.sparse.csc_matrix],
+        users_in_clusters: Dict[str, pd.Series],
+        jaccard_filenames: Dict[str, str],
+        linlog_filename: str,
+        loglog_filename: str,
+        mode: str,
+        show: bool = True):
+    """
+    """
+    if users_in_clusters.keys() != video_author_matrices.keys():
+        raise ValueError("Keys do not match in given dicts 'video_author_matrices' and'users_in_clusters'")
     else:
-        plt.title(f'Distribution of Jaccard indices of pairs of users from cluster {cluster_name_1} and {cluster_name_2}')
-    plt.xlabel('Jaccard index')
-    # plt.ylim(0, ylim)
-    plt.ylabel('Number of Pairs')
-    plt.grid(True)
-    plt.tight_layout()
-    
-    plt.savefig(fig_loglog_filepath)
-    if show:
-        plt.show()
+        for key in jaccard_filenames.keys():
+            if not np.array([key_i in users_in_clusters.keys() for key_i in key.split('_')]).all():
+                raise ValueError("Keys of given dict 'jaccard_filenames' do not match the given keys "
+                                 "in the other dicts.")
 
-    
-    del fig_loglog
-    print(gc.collect())
+    if mode == 'linlog':
+        fig_linlog, axs_linlog = plt.subplots(len(users_in_clusters), len(users_in_clusters),
+                                              sharex=True, sharey=True)
+        fig_linlog.subplots_adjust(hspace=0, wspace=0)
+        axs_loglog = [[None] * len(users_in_clusters)] * len(users_in_clusters)
+    elif mode == 'loglog':
+        fig_loglog, axs_loglog = plt.subplots(len(users_in_clusters), len(users_in_clusters),
+                                              sharex=True, sharey=True)
+        fig_loglog.subplots_adjust(hspace=0, wspace=0)
+        axs_linlog = [[None] * len(users_in_clusters)] * len(users_in_clusters)
+    elif mode == 'both':
+        fig_linlog, axs_linlog = plt.subplots(len(users_in_clusters), len(users_in_clusters),
+                                              sharex=True, sharey=True)
+        fig_linlog.subplots_adjust(hspace=0, wspace=0)
+        fig_loglog, axs_loglog = plt.subplots(len(users_in_clusters), len(users_in_clusters),
+                                              sharex=True, sharey=True)
+        fig_loglog.subplots_adjust(hspace=0, wspace=0)
+    else:
+        raise ValueError("Mode must be 'linlog', 'loglog' or 'both'.")
+
+    # load colormap
+    cmap = colormaps['Set3']
+
+    # go through all combinations of clusters 
+    # (but skip (cluster2, cluster1) of (cluster1, cluster2) has already been calculated)
+    for i, name1 in enumerate(list(users_in_clusters.keys())):
+        for j, name2 in enumerate(list(users_in_clusters.keys())[i:]):
+
+            print(f"Getting Jaccard index histograms for cluster {name1} with cluster {name2}...")
+
+            plot_histograms_of_jaccard_indices_from_matrix_to_ax(
+                jaccard_index_matrix=np.load(jaccard_filenames[name1 + "_" + name2]),
+                color=cmap(i*len(users_in_clusters)+j),
+                cluster_name_1=name1,
+                cluster_name_2=name2,
+                users_in_rows=users_in_clusters[name1],
+                users_in_cols=users_in_clusters[name2],
+                ax_linlog=axs_linlog[i, j + i],
+                ax_loglog=axs_loglog[i, j + i])
+            
+            if mode ==  'linlog' or mode == 'both':
+                fig_linlog.suptitle('Distribution of Jaccard indices of pairs of users from different clusters')
+                # axs_linlog[i, j + i].set_title(f"{name1} - {name2}")
+                if j + i == len(users_in_clusters) - 1:
+                    axs_linlog[i, j + i].set_ylabel('Number of Pairs')
+                if i == 0:
+                    axs_linlog[i, j + i].set_xlabel('Jaccard index')
+
+                axs_linlog[i, j + i].legend(handlelength=0.)
+                axs_linlog[i, j + i].grid(True)
+            
+            if mode ==  'loglog' or mode == 'both':
+                fig_loglog.suptitle('Distribution of Jaccard indices of pairs of users from different clusters')
+                # axs_loglog[i, j + i].set_title(f"{name1} - {name2}")
+                if j + i == len(users_in_clusters) - 1:
+                    axs_loglog[i, j + i].set_ylabel('Number of Pairs')
+                if i == 0:
+                    axs_loglog[i, j + i].set_xlabel('Jaccard index')
+
+                axs_loglog[i, j + i].legend(handlelength=0.)
+                axs_loglog[i, j + i].grid(True)
+            print("Done.")
+
+    if mode == 'linlog' or mode == 'both':
+        fig_linlog.savefig(linlog_filename)
+        print(f"Saved linlog plot in file {linlog_filename}.")
+        if show is True:
+            fig_linlog.show()
+
+    if mode == 'loglog' or mode == 'both':
+        fig_loglog.savefig(loglog_filename)
+        print(f"Saved loglog plot in file {loglog_filename}.")
+        if show is True:
+            fig_loglog.show()
+
+    gc.collect()
 
 
 def create_jaccard_index_histograms_for_all_cluster_combinations(
