@@ -114,123 +114,7 @@ def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple =
             return result
 
 
-'''
 
-def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, 
-                                           index: bool, index_label = None,
-                                           every: int = 1, overwrite: bool = False,
-                                           print_time: bool | Tuple = False,
-                                           strip_newlines: bool = False):
-    """
-    Runs a given function that works on a (single) dataframe, but runs it on the given reader. 
-    The function returns nothing, but saves the results into a single csv.
-
-    Args:
-        reader: iterator object that returns the chunks, you can get it for example by calling pd.read_csv(...., chunksize=something).
-        filename: file path and name, including the ending .csv, and optionally an ending for compression (such as .gz)
-        index: bool, will be passed directly to the to_csv function. If True, also saves the index.
-        index_label: can be string, list of strings, False or None (default). Is passed directly to the to_csv function.
-            If False, doesn't save a label for the index column. If None, uses the index name from the df. Otherwise, 
-            uses the given string. (Sequence is only used for multi index)
-        overwrite: if True (default is False), will overwrite existing file. Otherwise raises error.
-        every: will save every <every> chunks. Default is 1 (saves after every chunk)
-        print_time: If False (default), does not print time data. If True, prints the average time per chunk.
-            If a tuple with two entries is given, where the fist is the chunk size used in the reader, 
-            and the second is the total number of entries in the dataset,
-            then additional data about estimated time left is printed.
-        
-    """
-    if os.path.isfile(filename) and overwrite is not True:
-        raise ValueError("the given file already exists.\n" + 
-                         "This function will not overwrite files for data safety reasons, unless overwrite=True is passed.")
-    elif os.path.isfile(filename) and overwrite is True:
-        os.remove(filename)
-        print("Removed the existing file, because overwrite=True was passed.")
-    
-    with reader:
-        
-        # result = pd.DataFrame()
-        if not print_time:
-            header = True  # when writing to the csv the first time, include header
-            result = pd.DataFrame()
-            for i, chunk in enumerate(reader):
-                result = pd.concat([result, fct(chunk)])
-                if (i + 1) % every == 0:
-                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                    header = False  # when appending new rows to the csv, don't include header
-                    print("Appended new rows to the csv file")
-                    del result
-                    gc.collect()
-                    result = pd.DataFrame()
-            
-            if not result.empty:  # if there is something left to apppend to the csv, do that now
-                #result.description.apply(lambda x : x.replace('\n',''))
-                result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                print("Appended last rows to the csv file")
-            return
-        
-        elif print_time is True:
-            time_start_global = time.time()
-            header = True
-            result = pd.DataFrame()
-            for i, chunk in enumerate(reader):
-                print(f"Going through chunk {i}...")
-                result = pd.concat([result, fct(chunk)])
-                if (i+1) % every == 0:
-                    time_save_start = time.time()
-                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                    time_save_end = time.time()
-                    print("Appended new rows to the csv file")
-                    print(f"Time spent saving: {time_save_end - time_save_start} secs")
-                    header = False  # when appending new rows to the csv, don't include header
-                    del result
-                    gc.collect()
-                    result = pd.DataFrame()
-                time_end = time.time()
-                print(f"{(time_end-time_start_global)/(i+1):.3f} secs per chunk on average.")
-
-            if not result.empty:  # if there is something left to apppend to the csv, do that now
-                time_save_start = time.time()
-                result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                time_save_end = time.time()
-                print("Appended last rows to the csv file")                   
-                print(f"Time spent saving: {time_save_end-time_save_start} secs")
-            return
-        
-        else:
-            time_start_global = time.time()
-            header = True
-            result = pd.DataFrame()
-            for i, chunk in enumerate(reader):
-                print(f"Going through chunk {i}...")
-                result = pd.concat([result,fct(chunk)])
-                if (i+1) % every == 0:
-                    time_save_start = time.time()
-                    result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                    time_save_end = time.time()
-                    print("Appended new rows to the csv file")                   
-                    print(f"Time spent saving: {time_save_end-time_save_start} secs\n")
-                    header = False  # when appending new rows to the csv, don't include header
-                    del result
-                    gc.collect()
-                    result = pd.DataFrame()
-                    result = result['cahnnekl_id', 'description']
-                time_end = time.time()
-                processed_entries = (i+1)*print_time[0]
-                entries_left = print_time[1] - processed_entries
-                avg_time_per_chunk = (time_end-time_start_global)/(i+1)
-                print(f"The first {processed_entries} entries have been processed. {entries_left} left.")
-                print(f"{avg_time_per_chunk:.3f} secs per chunk on average. Meaning  {entries_left * avg_time_per_chunk /(print_time[0]* 60):.3f} minutes left.\n")
-
-            # if there is something left to apppend to the csv, do that now
-            if not result.empty:
-                time_save_start = time.time()
-                result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                time_save_end = time.time()
-                print("Appended last rows to the csv file")                   
-                print(f"Time spent saving: {time_save_end-time_save_start} secs")
-            return
-'''
 
 
 def run_simple_function_on_chunks_save_csv(reader, fct, filename: str, 
@@ -263,28 +147,28 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
         os.remove(filename)
         print("Removed the existing file, because overwrite=True was passed.")
     
-    # Predefined list of expected columns to ensure consistency
+    # Predefined list of expected columns depending if looking at video or columns, to ensure good structure 
     expected_columns_video = ['categories', 'channel_id', 'crawl_date', 'description', 
                         'dislike_count', 'display_id', 'duration', 'like_count', 
                         'tags', 'title', 'upload_date', 'view_count']
     expected_columns_comments= ['author','video_id','likes','replies']
     with reader:
-        header = True  # First chunk will have the header
+        header = True  
         result = pd.DataFrame()
 
         if not print_time:
-            # Default chunk processing mode (without time tracking)
+            #condition if it is a video, other wise look at comments 
             if video==True:
                 for i, chunk in enumerate(reader):
                     chunk.columns = chunk.columns.str.strip()  # Remove extra spaces from column names
-                    chunk = chunk[expected_columns_video]  # Reorder columns to match the expected order
+                    chunk = chunk[expected_columns_video]  # Reorder columns to match the expected order -> ensure consistency of columns, because other wise it may mix
 
                     # Apply the function to the chunk
                     result = pd.concat([result, fct(chunk)], ignore_index=True)
                     
                     if (i + 1) % every == 0:
                         result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                        header = False  # After the first chunk, don't write header again
+                        header = False  
                         print(f"Appended new rows to the CSV file (after {i+1} chunks)")
                         del result
                         gc.collect()
@@ -294,29 +178,26 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
                 if not result.empty:
                     result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                     print("Appended last rows to the CSV file")
-            else:
+            else: #same code if comments
                 for i, chunk in enumerate(reader):
-                    chunk.columns = chunk.columns.str.strip()  # Remove extra spaces from column names
-                    chunk = chunk[expected_columns_comments]  # Reorder columns to match the expected order
-
-                    # Apply the function to the chunk
+                    chunk.columns = chunk.columns.str.strip() 
+                    chunk = chunk[expected_columns_comments]  
                     result = pd.concat([result, fct(chunk)], ignore_index=True)
                     
                     if (i + 1) % every == 0:
                         result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
-                        header = False  # After the first chunk, don't write header again
+                        header = False  
                         print(f"Appended new rows to the CSV file (after {i+1} chunks)")
                         del result
                         gc.collect()
                         result = pd.DataFrame()
 
-                # After all chunks have been processed, save the remaining result
                 if not result.empty:
                     result.to_csv(filename, header=header, mode='a', index=index, index_label=index_label)
                     print("Appended last rows to the CSV file")
         
         elif print_time is True:
-            # Time logging with average time per chunk
+           
             time_start_global = time.time()
             header = True
             result = pd.DataFrame()
@@ -380,7 +261,6 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
 
         
         else:
-            # Full time logging with remaining time estimation
             time_start_global = time.time()
             header = True
             result = pd.DataFrame()
@@ -452,6 +332,21 @@ def run_simple_function_on_chunks_save_csv(reader, fct, filename: str,
 
         
     return
+
+def count_videos_by_category(chunk):
+    """
+    Function that process a single chunk and count the number of video per category
+
+    Args: 
+        chunk: the chunk you want to process
+
+    Returns: dataframe of the number of counts per category
+    """
+    
+    # Count videos in each category within the chunk
+    category_counts = chunk['categories'].value_counts().to_frame().T  # Get counts and transpose for one-row DataFrame
+    category_counts.columns.name = None  # Remove column name for easy concatenation
+    return category_counts
 
 
 def get_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False) -> pd.DataFrame:
@@ -713,67 +608,94 @@ def plot_dist_comment(comment_counts, channel_name, color):
     plt.show() 
 
 
-def plot_histo(comment_counts, channel_name, color, ylim):
+def plot_histo_subplot(data, titles, colors, ylims, num_cols=2):
     """
-    Plot histogram in normal scale
+    Plot multiple histograms in subplots.
 
     Args:
-        comments_counts: number of comments
-        channel_name: name of channel you're interested in 
-        color: color of your histogram 
-        ylim: y limit you want to set
-
+        data: List of (comment_counts, channel_name) tuples.
+        titles: List of channel names.
+        colors: List of colors for each histogram.
+        ylims: List of y-limits for each histogram.
+        num_cols: Number of columns for subplots 
     """
-    bins = range(0, comment_counts.max() + 10, 10)  # Create bins from 0 to max comments in steps of 10
-    bin_labels = [f'{i}-{i+9}' for i in bins[:-1]]  # Labels like '0-10', '10-20', etc.
+    num_plots = len(data)
+    num_rows = (num_plots + num_cols - 1) // num_cols #rows depending on number of columsn
 
-    # Use pd.cut to bin the comment counts 
-    comment_counts_binned = pd.cut(comment_counts, bins=bins, labels=bin_labels, right=False)
-    authors_per_bin = comment_counts_binned.value_counts().sort_index()
-    authors_per_bin = authors_per_bin.reset_index()
-    authors_per_bin.columns = ['Comment Range', 'Number of Authors']
+    plt.figure(figsize=(15, num_rows * 5)) #figure size depend of number of rows
 
-    # Plot the histogram
-    plt.figure(figsize=(10, 6))
-    plt.hist(comment_counts, bins=bins, alpha=0.7, color=color)
-    plt.title(f'Distribution of Comments per Author ({channel_name})')
-    plt.xlabel('Number of Comments')
-    plt.ylim(0, ylim)
-    plt.ylabel('Number of Authors')
-    plt.grid(True)
+    for i, (comment_counts, channel_name) in enumerate(data):
+        bins = range(0, comment_counts.max() + 10, 10)  
+        
+
+        
+        plt.subplot(num_rows, num_cols, i + 1)
+        plt.hist(comment_counts, bins=bins, alpha=0.7, color=colors[i])
+        plt.title(f'Distribution of Author per Comments ({titles[i]})')
+        plt.xlabel('Number of Comments')
+        plt.ylim(0, ylims[i])
+        plt.ylabel('Number of Authors')
+        plt.grid(True)
+
     plt.tight_layout()
     plt.show()
 
-def plot_log_histo(comment_counts, channel_name, color):
+
+def plot_log_histo_subplot(data, titles, colors,  num_cols=2):
     """
-    Plot histogram in log-log scale
+    Plot multiple histograms in subplots using log-log scale.
 
     Args:
-        comments_counts: number of comments
-        channel_name: name of channel you're interested in 
-        color: color of your histogram 
-
+        data: List of (comment_counts, channel_name) tuples.
+        titles: List of channel names.
+        colors: List of colors for each histogram.
+        ylims: List of y-limits for each histogram.
+        num_cols: Number of columns for subplots (default is 2).
     """
-    log_bins = np.logspace(np.log10(1), np.log10(comment_counts.max()), num=20)    
-    bin_labels = [f'{int(log_bins[i])}-{int(log_bins[i+1])}' for i in range(len(log_bins)-1)] 
+    num_plots = len(data)
+    num_rows = (num_plots + num_cols - 1) // num_cols  
 
-    comment_counts_binned = pd.cut(comment_counts, bins=log_bins, labels=bin_labels, right=False)
-    authors_per_bin = comment_counts_binned.value_counts().sort_index()
-    authors_per_bin = authors_per_bin.reset_index()
-    authors_per_bin.columns = ['Comment Range', 'Number of Authors']
+    plt.figure(figsize=(15, num_rows * 5)) 
 
-    # Plot the histogram
-    plt.figure(figsize=(10, 6))
-    plt.hist(comment_counts, bins=log_bins, alpha=0.7, color=color)
-    plt.xscale('log')  
-    plt.yscale('log') 
-    plt.title(f'Distribution of Comments per Author ({channel_name})')
-    plt.xlabel('Number of Comments')
-    plt.ylabel('Number of Authors')
-    plt.grid(True)
+    for i, (comment_counts, channel_name) in enumerate(data):
+        log_bins = np.logspace(np.log10(1), np.log10(comment_counts.max()), num=20)    
+        
+
+        # Create a subplot
+        plt.subplot(num_rows, num_cols, i + 1)
+        plt.hist(comment_counts, bins=log_bins, alpha=0.7, color=colors[i])
+        plt.title(f'Distribution of Authors per Comments ({titles[i]}) (Log-Log)')
+        plt.xscale('log')  #log scale
+        plt.yscale('log')  #log scale 
+        plt.xlabel('Number of Comments (log scale)')
+        plt.ylabel('Number of Authors (log scale)')
+        plt.grid(True, which="both", linestyle='--', linewidth=0.5)
+
     plt.tight_layout()
     plt.show()
 
+def get_metadata_commenters(comment_data: pd.DataFrame, threshold: int = 0) -> pd.DataFrame:
+    """
+    Generates a dataframe with comment count and number of videos commented under, 
+    for each person that has commented.
+    Works on any df containing a set of comment data 
+    (e.g., filtered to contain only comments under videos from a certain channel).
+
+    Args:
+        comment_data: df containing the comments for which to generate metadata
+        threshold: (default 0) only commenters with more than this amount of comments 
+            will be included in the dataframe.
+
+    Returns:
+        df with columns author, number of comments and number of videos
+    """
+
+    metadata_commenters = comment_data.groupby('author').agg(number_of_comments=('author', 'size')).reset_index()
+    metadata_commenters['number_of_videos']= comment_data.groupby('author')['video_id'].nunique().values
+    
+    #keep users that wrote more than <threshold> comments 
+    metadata_commenters=metadata_commenters[metadata_commenters['number_of_comments']>=threshold]
+    return metadata_commenters
 
 def common_commented_videos(matrix, user_i: int, user_j: int):
     """
@@ -2167,6 +2089,31 @@ def get_jacc_mean_between_two_clusters(matrix_1: scipy.sparse.csc_matrix,
     del jaccard_without_duplicates
     gc.collect()
     return mean_jaccard
+
+
+
+def average_pairwise_overlap(bubbles_video_author_matrices):
+        """
+        Define the average pairwise overlap within each bubble for each channel
+        
+        Args:
+            bubbles_video_author_matrices: matrix of each bubble
+
+        Returns:
+            channel_average: dictionnary of the mean jaccard index within bubble for each channel (channel as keyword)
+
+        
+        """
+        channel_averages = {}
+        channels= ['cnn','abc','bbc','aje','fox']
+        for channel in channels:
+                channel_averages[channel] = []
+                for matrix in bubbles_video_author_matrices[channel]:
+                        average = get_mean_jacc(matrix)
+                        channel_averages[channel].append(average)
+        return channel_averages
+
+
 
 
 def percentage_users(sparse_matrix):
