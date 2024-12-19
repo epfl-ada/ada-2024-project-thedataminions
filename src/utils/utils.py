@@ -2232,28 +2232,6 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
 
     plt.show()
 
-    #Plot bar chart for each channel - number of videos- WITHOUT TRUMP WORD because so big 
-    fig, ax = plt.subplots()
-    bar_width = 0.2  # Width of the bars
-    index = range(len(clusters))  # Position of each bar on the x-axis
-
-    # Create a bar for each keyword - want all the bar on a single plot
-    # Exclude 'Trump' from keywords
-    filtered_keywords = [word for word in keywords if word != 'Trump']
-    for i, word in enumerate(filtered_keywords):
-        ax.bar([pos + i * bar_width for pos in index], number_vid[word], bar_width, label=word)
-
-    ax.set_title("Number of videos depending on the title")
-    ax.set_xlabel("Channels")
-    ax.set_ylabel("Number of videos")
-    ax.set_xticks([pos + bar_width for pos in index])  
-    ax.set_xticklabels(clusters.keys()) 
-    ax.legend(title="Keywords")
-
-    plt.show()
-
-       
-    
     
     #Plot bar chart for each channel - percentage
     fig, ax = plt.subplots()
