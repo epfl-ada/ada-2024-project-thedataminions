@@ -10,6 +10,7 @@ import scipy.sparse
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
 import seaborn as sns
+from sklearn.metrics import jaccard_score
 
 def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
                                          save: Optional[str] = None, 
@@ -1068,6 +1069,65 @@ def get_video_user_matrix(users_to_consider: pd.Series,
 
     return video_author_matrix
 
+#first functions to calculate jaccard index : using jaccard_score function from sklearn.metrics library
+#for 2 different clusters
+def get_jacc_between_two_clusters_and_get_mean_sklearn_function(cluster1, cluster2, original_userid1, original_userid2):
+    jaccard_list = []
+    for i in range(cluster1.shape[1]):
+        original_user1 = original_userid1[i]
+        user1_array = cluster1.getcol(i).toarray().flatten()
+        for j in range(cluster2.shape[1]):
+            original_user2 = original_userid2[j]
+            if original_user1!=original_user2 : 
+                user2_array = cluster2.getcol(j).toarray().flatten()
+                jaccard_list.append(jaccard_score(user1_array,user2_array))
+    
+    overall_jaccard = sum(jaccard_list)/len(jaccard_list)
+
+    return overall_jaccard, jaccard_list
+#for the same cluster
+def get_jacc_between_same_cluster_and_get_mean_sklearn_function(cluster1):
+    jaccard_list = []
+    for i in range(cluster1.shape[1]):
+        user1_array = cluster1.getcol(i).toarray().flatten()
+        for j in range(i+1, cluster1.shape[1]): 
+            user2_array = cluster1.getcol(j).toarray().flatten()
+            jaccard_list.append(jaccard_score(user1_array,user2_array))
+    
+    overall_jaccard = sum(jaccard_list)/len(jaccard_list)
+    
+    return overall_jaccard, jaccard_list
+
+#other way of coding the function to calculate jaccard index : do the calculations by hand of the jaccard index = 1-(TF+FT/TT+TF+FT) (see definition of jaccard index)
+#for 2 different clusters
+def get_jacc_between_two_clusters_and_get_mean_by_hand(cluster1, cluster2, original_userid1, original_userid2):
+    jaccard_list = []
+    for i in range(cluster1.shape[1]):
+        original_user1 = original_userid1[i]
+        for j in range(cluster2.shape[1]):
+            original_user2 = original_userid2[j]
+            if original_user1!=original_user2 : 
+                TT = cluster1.getcol(i).multiply(cluster2.getcol(j))
+                TF = (cluster1.getcol(i)-cluster2.getcol(j)).multiply(cluster1.getcol(i))
+                FT = (cluster2.getcol(j)-cluster1.getcol(i)).multiply(cluster2.getcol(j))
+                jaccard_list.append(1-((TF.sum()+FT.sum())/(TT.sum()+TF.sum()+FT.sum())))
+
+    overall_jaccard = sum(jaccard_list)/len(jaccard_list)
+
+    return overall_jaccard, jaccard_list
+#for the same cluster
+def get_jacc_between_same_cluster_and_get_mean_by_hand(cluster1):
+    jaccard_list = []
+    for i in range(cluster1.shape[1]):
+        for j in range(i+1, cluster1.shape[1]): 
+            TT = cluster1.getcol(i).multiply(cluster1.getcol(j))
+            TF = (cluster1.getcol(i)-cluster1.getcol(j)).multiply(cluster1.getcol(i))
+            FT = (cluster1.getcol(j)-cluster1.getcol(i)).multiply(cluster1.getcol(j))
+            jaccard_list.append(1-((TF.sum()+FT.sum())/(TT.sum()+TF.sum()+FT.sum())))
+    
+    overall_jaccard = sum(jaccard_list)/len(jaccard_list)
+    
+    return overall_jaccard, jaccard_list
 
 def add_zero_cols_to_sparse_matrix(matrix: scipy.sparse.csc_matrix, col_indices) -> scipy.sparse.csc_matrix:
     """
