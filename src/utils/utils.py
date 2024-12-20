@@ -1,5 +1,6 @@
 """Functions for processing (big) datasets. Will be called from the notebook"""
 import time
+import networkx as nx
 import pandas as pd
 from typing import Tuple, Optional, Dict, List, Callable
 import gc
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps
 import seaborn as sns
 from sklearn.metrics import jaccard_score
+from matplotlib.lines import Line2D
 
 
 #------------------------------------READERS--------------------------------------------------------
@@ -2429,7 +2431,181 @@ def get_jacc_mean_between_two_clusters(matrix_1: scipy.sparse.csc_matrix,
     gc.collect()
     return mean_jaccard
 
+def network_graph_clusters(df_mean_jaccard:pd.DataFrame)->None:
+    """
+    Plot a network graph of clusters (=nodes) with weighted edges between them depending on the value of the mean jaccard index
+    calculated before.
 
+    Args:
+        df_mean_jaccard: the panda dataframe of mean jaccard index between clusters.
+
+    Returns:
+            None
+    """
+    edges = []
+    #creation of the different edges
+    for i, row in enumerate(df_mean_jaccard.index):
+        for j, col in enumerate(df_mean_jaccard.columns):
+            if i < j:  # avoid taking two times the same pair or the value for the cluster with itself
+                weight = df_mean_jaccard.iloc[i, j]
+                if weight > 0:  #only taking edges different from 0
+                    edges.append((row, col, weight))
+
+    #graph creation
+    G = nx.Graph()
+    G.add_weighted_edges_from(edges) #taking weights into account from the jaccard distances
+
+    #different colors for each cluster
+    node_colors = plt.cm.tab10(np.linspace(0, 1, len(df_mean_jaccard.columns)))
+
+    #nodes position using spring_layout -> according to if nodes are linked or not
+    pos = nx.spring_layout(G, seed=42)
+
+    #draw nodes on the graph
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=800)
+
+    #draw edges wwith thickness proportionnal to jaccard distance between two clusters
+    weights = [G[u][v]['weight'] for u, v in G.edges()]
+    nx.draw_networkx_edges(G, pos, width=[w * 1000 for w in weights])
+
+    #labels
+    nx.draw_networkx_labels(G, pos, font_size=12, font_color="black")
+    
+    plt.title("Cluster Network with Jaccard Distances")
+    plt.show()
+
+def network_graph_bubbles(dictionnary_distance_matrices:dict, dictionnary_bubbles_labels:dict)->None:
+    """
+    Plot a network graph for each cluster of the users (=nodes) with edges between them depending on the value of the cosin distance
+    calculated before. User's color depends of the bubble they are part ouf within the cluster. The purpose here is to visualize the
+    bubbles determined with DBSCAN. We only plot edges between users if the distance is less than 0.9, meaning that they are plot only
+    if the users are close. The edges are not weighted base on the cosin distance values since we have clusters that are too big for
+    that. 
+
+    Args:
+        dictionnary_distance_matrices: dictionnary containing the cosin distance matrix for each cluster (calculated for the DBSCAN)
+        dictionnary_bubbles_labels: dictionnary containing a list for each cluster, of the same length as the number of users in the
+        cluster, giving for each user of the cluster the name of the bubble it is part of (= results of the DBSCAN)
+
+    Returns:
+            None
+    """
+    for key in dictionnary_distance_matrices :
+        distance_matrix = dictionnary_distance_matrices[key]
+        bubbles = ["outliers" if bubble == -1 else bubble for bubble in dictionnary_bubbles_labels[key]] #the outlier bubble is identified as -1 in the DBSCAN results, change the name -1 for outliers
+
+        #Combine tab20 and tab20b color pallets for up to 27 distinct colors since we have maximum 26 different bubbles + outliers  
+        colors_tab20 = plt.cm.tab20(np.linspace(0, 1, 20))
+        colors_tab20b = plt.cm.tab20b(np.linspace(0, 1, 7))
+        all_colors = np.vstack([colors_tab20, colors_tab20b])
+        
+        #Generate unique colors for each bubble
+        unique_bubbles = list(set(bubbles))
+        colors = all_colors[:len(unique_bubbles)]
+        bubble_colors = {bubble: colors[i] for i, bubble in enumerate(unique_bubbles)}
+
+        #Create the graph
+        G = nx.Graph()
+
+        #Generate nodes with colors based on bubbles
+        node_colors = []
+        for i, bubble in enumerate(bubbles):
+            G.add_node(i, bubble=bubble)
+            node_colors.append(bubble_colors[bubble])
+
+        #Generate edges only if the distance exceeds the threshold, so only if users are close
+        threshold = 0.9
+        for i in range(distance_matrix.shape[0]):
+            for j in range(i + 1, distance_matrix.shape[1]):
+                if distance_matrix[i, j] < threshold:  # Only add edges above threshold
+                    G.add_edge(i, j)
+
+        #Generate positions for nodes using spring layout -> according to if nodes are linked or not, 
+        # if nodes are linked by an edge they will be closer, if not they will repeal each other
+        pos = nx.spring_layout(G, seed=42)
+
+        plt.figure(figsize=(12, 12))
+
+        #Draw nodes
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=10, alpha=0.3)
+
+        #Draw edges (not weighted based on the cosin distances)
+        nx.draw_networkx_edges(G, pos, width = 0.5, alpha=0.5, edge_color='black')
+
+        #legend
+        legend_elements = [Line2D([0], [0], marker='o', color='w', markerfacecolor=bubble_colors[bubble],
+                          markersize=10, label=bubble) for bubble in unique_bubbles]
+        plt.legend(handles=legend_elements, title="Bubbles", loc="upper left", fontsize=8)
+
+        plt.title(f"DBSCAN bubbles of {key} users", fontsize=12)
+        plt.show()
+
+def network_graph_bubbles_without_outliers(dictionnary_distance_matrices:dict, dictionnary_bubbles_labels:dict)->None:
+    """
+    Plot a network graph for each cluster of the users (=nodes) with edges between them depending on the value of the cosin distance
+    calculated before but without the outliers. User's color depends of the bubble they are part ouf within the cluster. The purpose here is to visualize the
+    bubbles determined with DBSCAN. We only plot edges between users if the distance is less than 0.9, meaning that they are plot only
+    if the users are close. The edges are not weighted base on the cosin distance values since we have clusters that are too big for
+    that. 
+
+    Args:
+        dictionnary_distance_matrices: dictionnary containing the cosin distance matrix for each cluster (calculated for the DBSCAN)
+        dictionnary_bubbles_labels: dictionnary containing a list for each cluster, of the same length as the number of users in the
+        cluster, giving for each user of the cluster the name of the bubble it is part of (= results of the DBSCAN)
+
+    Returns:
+            None
+    """
+    for key in dictionnary_distance_matrices :
+        distance_matrix = dictionnary_distance_matrices[key]
+        bubbles = ["outliers" if bubble == -1 else bubble for bubble in dictionnary_bubbles_labels[key]] #the outlier bubble is identified as -1 in the DBSCAN results, change the name -1 for outliers
+
+        #Combine tab20 and tab20b color pallets for up to 27 distinct colors since we have maximum 26 different bubbles + outliers  
+        colors_tab20 = plt.cm.tab20(np.linspace(0, 1, 20))
+        colors_tab20b = plt.cm.tab20b(np.linspace(0, 1, 7))
+        all_colors = np.vstack([colors_tab20, colors_tab20b])
+        
+        #Generate unique colors for each bubble
+        unique_bubbles = list(set(bubbles))
+        colors = all_colors[:len(unique_bubbles)]
+        bubble_colors = {bubble: colors[i] for i, bubble in enumerate(unique_bubbles)}
+
+        #Create the graph
+        G = nx.Graph()
+
+        #Generate nodes with colors based on bubbles
+        node_colors = []
+        for i, bubble in enumerate(bubbles):
+            if bubble!='outliers':
+                G.add_node(i, bubble=bubble)
+                node_colors.append(bubble_colors[bubble])
+
+        #Generate edges only if the distance exceeds the threshold, so only if users are close
+        threshold = 0.9
+        for i in range(distance_matrix.shape[0]):
+            for j in range(i + 1, distance_matrix.shape[1]):
+                if distance_matrix[i, j] < threshold and bubbles[i] != "outliers" and bubbles[j] != "outliers":  # Only add edges above threshold
+                    G.add_edge(i, j)
+
+        #Generate positions for nodes using spring layout -> according to if nodes are linked or not, 
+        # if nodes are linked by an edge they will be closer, if not they will repeal each other
+        pos = nx.spring_layout(G, seed=42)
+
+        plt.figure(figsize=(12, 12))
+
+        #Draw nodes
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=10, alpha=0.3)
+
+        #Draw edges (not weighted based on the cosin distances)
+        nx.draw_networkx_edges(G, pos, width = 0.5, alpha=0.5, edge_color='black')
+
+        #legend
+        legend_elements = [Line2D([0], [0], marker='o', color='w', markerfacecolor=bubble_colors[bubble],
+                          markersize=10, label=bubble) for bubble in unique_bubbles if bubble != "outliers"]
+        plt.legend(handles=legend_elements, title="Bubbles", loc="upper left", fontsize=8)
+
+        plt.title(f"DBSCAN bubbles of {key} users", fontsize=12)
+        plt.show()
 
 def average_pairwise_overlap(bubbles_video_author_matrices: Dict[str, List[scipy.sparse.csr_matrix]]) -> Dict[str, List[float]]:
         """
