@@ -1,7 +1,7 @@
 """Functions for processing (big) datasets. Will be called from the notebook"""
 import time
 import pandas as pd
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, Callable
 import gc
 import os
 from math import floor
@@ -587,7 +587,7 @@ def count_na_entries(data: pd.DataFrame, col: str = "any", reverse: bool = False
             return pd.DataFrame({"non-na rows": len(data[data.notna()[col]]), 
                                  "total rows": len(data)}, index=[0])
 
-def clean (df, save):
+def clean (df:pd.DataFrame, save:bool)-> pd.DataFrame:
     """
     Cleans a given df form empty and NaN values. Can be applied to a small df that we want to save in a clean version, as well as temporary chunks when reading a huge df.
 
@@ -2431,7 +2431,7 @@ def get_jacc_mean_between_two_clusters(matrix_1: scipy.sparse.csc_matrix,
 
 
 
-def average_pairwise_overlap(bubbles_video_author_matrices):
+def average_pairwise_overlap(bubbles_video_author_matrices: Dict[str, List[scipy.sparse.csr_matrix]]) -> Dict[str, List[float]]:
         """
         Define the average pairwise overlap within each bubble for each channel
         
@@ -2454,8 +2454,78 @@ def average_pairwise_overlap(bubbles_video_author_matrices):
 
 
 
+def pie_chart_plot(cluster_name:str, sizes:List[int],labels:List[str],threshold=0)-> None:
+    """
+        Function for the pie chart plotting
+        
+        Args:
+            cluster_name: name of the cluster of interest
+            sizes: number of videos per media
+            labels: keys of videos
+            thresold: inpput thresold depending on how much we wnat our users to have commented under the videos
 
-def percentage_users(sparse_matrix):
+        Returns:
+            None
+            
+    """
+        
+    def custom_autopct(pct): #creating a customized way of plotting the percentages on the pie chart
+        return f"{pct:.2f}%" if pct > 3 else "" #only displaying percentages bigger than 3%
+    fig, ax = plt.subplots()
+    wedges, texts, autotexts = ax.pie(sizes, labels=None, autopct= custom_autopct,shadow=True, explode=(0.2,0.2,0.2,0.2,0.2,0.2))
+    ax.legend(wedges, labels, loc="lower right")
+    plt.title(
+    f"Distribution of videos commented by more than {threshold*100:.0f}% of {cluster_name} cluster members\n"
+    "across all News and Politics channels."
+    )
+    plt.show()
+
+
+def pie_chart_repartition_media(clusters_matrix:Dict[str, scipy.sparse.csc_matrix] , channel_ids:Dict[str, str], videos_new_pol:pd.DataFrame , threshold = 0)-> None:
+    """
+        Plotting a pie chart for each cluster of the repartition of commented videos depending on which channel they are from
+        
+        Args:
+            cluster_matrix: name of the bubbles
+            channels_id: id of the channels
+            videos_new_pol: df of interest
+            thresold: inpput thresold depending on how much we wnat our users to have commented under the videos
+
+        Returns:
+            None
+            
+    """
+    for key in clusters_matrix :
+        #for every video of news and politics catehory, getting the percentage of users of the cluster that commented under
+        percentage =  percentage_users(clusters_matrix[key])
+
+        #retrieve videos where more users than the threshold (in percentage) in the cluser has commented under
+        mask = percentage > threshold
+        sub_news_pol = videos_new_pol[mask]
+        
+        #filtered video depeding on which cannel it is from : CNN, BBC, ABC, Fox, AJE or other
+        nb_video_per_media = {}
+        for key1 in channel_ids :
+            nb_videos = sub_news_pol[sub_news_pol['channel_id']==channel_ids[key1]]
+            nb_video_per_media[key1]=len(nb_videos)
+
+        #getting the total number of videos we are taking into account (commented by more than threshold% of the cluster users)
+        nb_videos_total = len(percentage[percentage > threshold])
+        #getting the total number of videos from the 5 main channels we are taking into account (commented by more than threshold% of the cluster users)
+        nb_tot_video_big_media=0
+        for key2 in nb_video_per_media:
+            nb_tot_video_big_media += nb_video_per_media[key2]
+        #getting the number of videos not from the 5 main channels we are taking into account (commented by more than threshold% of the cluster users)
+        nb_video_per_media['other']= nb_videos_total-nb_tot_video_big_media
+
+        # Convert dictionary values to lists for the pie_chart_plot function
+        sizes = list(nb_video_per_media.values())
+        labels = list(nb_video_per_media.keys())
+
+        print(f'{nb_videos_total} out of {len(percentage[percentage > 0])} total viceos commented are taken into account in this pie chart')
+        pie_chart_plot(key, sizes, labels, threshold)
+
+def percentage_users(sparse_matrix: scipy.sparse.csr_matrix) -> np.ndarray:
     """
     Get the percentage of users in a certain bubble that have commented under a specific video. 
     I.e. for each video, compute the perentage of users that have commented under it, divided by the total number of users withiin the bubble.
@@ -2475,7 +2545,7 @@ def percentage_users(sparse_matrix):
 
 
 
-def word_interest(sparse_matrix, percentage, videos_new_pol:pd, word_interest:str, map ):
+def word_interest(sparse_matrix: scipy.sparse.csr_matrix, percentage: np.ndarray, videos_new_pol:pd.DataFrame, word_interest:str, map: pd.DataFrame ) -> Tuple[pd.DataFrame, int, int, float]:
      """
     Find a word of interest in the title of the videos that a certain pourcentage of users has commented at (above acertain thresold).
     If a video has more than a certain thresold of its users that has commented under this video, then it is retrieving the title and looking for a specific word.
@@ -2515,98 +2585,77 @@ def word_interest(sparse_matrix, percentage, videos_new_pol:pd, word_interest:st
      return filtered_df, number_colum, total_number_user, percentage_total
 
 
-def process_word_interest(cluster_matrix, percentage_func, videos_mapping, word, video_mapping):
+def process_word_interest(cluster_matrix: scipy.sparse.csr_matrix,
+    percentage_func: Callable[[scipy.sparse.csr_matrix], np.ndarray],
+    videos_mapping: pd.DataFrame,
+    word: str,
+    video_mapping: pd.DataFrame
+) -> Tuple[pd.DataFrame, int, int, float, int]:
+    """
+    Find a word of interest in the title of the videos that a certain pourcentage of users has commented at (above acertain thresold).
+    If a video has more than a certain thresold of its users that has commented under this video, then it is retrieving the title and looking for a specific word.
+    The goal is to see if most of the videos as a specific subject (word) in common. 
+    
+    Args:
+        sparse_matrix: the video user matrix for the bubble you want 
+        percentage: percentage array of the sparse matrix, compute with percentage_users()
+        videos_new_pol : dataframe of all the videos in news and politics and categories, need to be load previously from the csv file
+        word of interest: word you want to look at within the videos
+        map: the mapping you want to apply 
+
+    Returns:
+    The number of videos with the word of interest
+    The dataframe with all the videos above the percentage with the word of interest, for more analysis purpose
+    """
     percentage = percentage_func(cluster_matrix) 
     filtered_df, number_colum, total_number_user, percentage_total = word_interest(cluster_matrix, percentage, videos_mapping, word, video_mapping)  
     number_of_videos = len(filtered_df) 
     return filtered_df, number_colum, total_number_user, percentage_total, number_of_videos
 
 
-'''
-def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
-    """Processes word interest and generates pie charts and trends for given keywords."""
-    #dict to store the percentage of users for each keyword
-    percentages = {keyword: [] for keyword in keywords}
-    number_vid = {keyword: [] for keyword in keywords}
+def process_and_plot_word_interest(bubble: Dict[str, scipy.sparse.csr_matrix],
+    videos_news_pol: pd.DataFrame,
+    map: pd.DataFrame,
+    keywords: List[str]
+) -> None:
+    """
+    Plotting the result of word_of_interest into two bar plot, one for the number of videos, one for the percentage of users
     
-        
-    #iterating over the key word
-    for word_of_interest in keywords:
-    
-        
-        #iterating over the clusters (cnn, bbc, abc, aje, fox)
-        for cluster_name, cluster_matrix in clusters.items():
-            filtered_df, _, _, percentage_total, number_of_videos = process_word_interest(
-                cluster_matrix, percentage_users, videos_news_pol, word_of_interest, map
-            )
-            percentages[word_of_interest].append(percentage_total)
-            number_vid[word_of_interest].append(number_of_videos)
-            
-    #Plot bar chart for each channel - number of videos
-    fig, ax = plt.subplots()
-    bar_width = 0.2  # Width of the bars
-    index = range(len(clusters))  # Position of each bar on the x-axis
+    Args:
+        bubble: bubbles of interest
+        videos_news_pol : df of videos news and politics
+        map:mapping to retrieve the titles
+        keywords : word of interest
 
-    # Create a bar for each keyword - want all the bar on a single plot
-    for i, word in enumerate(keywords):
-        ax.bar([pos +  (bar_width )  for pos in index], number_vid[word], bar_width, label=word)
-
-    ax.set_title("Number of videos depending on the title")
-    ax.set_xlabel("Channels")
-    ax.set_ylabel("Number of videos")
-    ax.set_xticks([pos + i*(bar_width ) for pos in index]) 
-    ax.set_xticklabels(clusters.keys()) 
-    ax.legend(title="Keywords")
-
-    plt.show()
-
-    
-    #Plot bar chart for each channel - percentage
-    fig, ax = plt.subplots()
-    bar_width = 0.2  # Width of the bars
-    index = range(len(clusters))  # Position of each bar on the x-axis
-
-    # Create a bar for each keyword - want all the bar on a single plot
-    for i, word in enumerate(keywords):
-        ax.bar([pos +  i*(bar_width)  for pos in index], percentages[word], bar_width, label=word)
-
-    ax.set_title("Interest in Keywords Across Channels")
-    ax.set_xlabel("Channels")
-    ax.set_ylabel("Percentage of Users")
-    ax.set_xticks([pos + (bar_width)  for pos in index])  
-    ax.set_xticklabels(clusters.keys()) 
-    ax.legend(title="Keywords")
-
-    plt.show()
-'''
-def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
-    """Processes word interest and generates pie charts and trends for given keywords."""
+    Returns:
+    The number of videos with the word of interest
+    The dataframe with all the videos above the percentage with the word of interest, for more analysis purpose
+    """
     # dict to store the percentage of users for each keyword
     percentages = {keyword: [] for keyword in keywords}
     number_vid = {keyword: [] for keyword in keywords}
     
     # iterating over the keywords
     for word_of_interest in keywords:
-        # iterating over the clusters (cnn, bbc, abc, aje, fox)
-        for cluster_name, cluster_matrix in clusters.items():
+        # iterating over the bubbles of interest
+        for cluster_name, cluster_matrix in bubble.items():
             filtered_df, _, _, percentage_total, number_of_videos = process_word_interest(
                 cluster_matrix, percentage_users, videos_news_pol, word_of_interest, map
             )
             percentages[word_of_interest].append(percentage_total)
             number_vid[word_of_interest].append(number_of_videos)
             
-    # Plot bar chart for number of videos
+    # plot bar chart for number of videos
     fig, ax = plt.subplots(figsize=(12, 6))
-    bar_width = 0.15  # Reduced width to fit bars closer together
-    num_channels = len(clusters)
+    bar_width = 0.15  
+    num_channels = len(bubble)
     num_keywords = len(keywords)
      
-    # Calculate the starting position for each group of bars
+    #starting position of bars
     indices = np.arange(num_channels)
     
     # Create bars for each keyword
     for i, word in enumerate(keywords):
-        # Calculate offset to center the group of bars
         offset = bar_width * (i - (num_keywords - 1)/2)
         ax.bar(indices + offset, number_vid[word], bar_width, label=word)
 
@@ -2614,7 +2663,7 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
     ax.set_xlabel("Bubbles")
     ax.set_ylabel("Number of Videos")
     ax.set_xticks(indices)
-    ax.set_xticklabels(clusters.keys())
+    ax.set_xticklabels(bubble.keys())
     ax.legend(title="Keywords", bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
     plt.show()
@@ -2624,7 +2673,6 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
     
     # Create bars for each keyword
     for i, word in enumerate(keywords):
-        # Calculate offset to center the group of bars
         offset = bar_width * (i - (num_keywords - 1)/2)
         ax.bar(indices + offset, percentages[word], bar_width, label=word)
 
@@ -2632,7 +2680,7 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
     ax.set_xlabel("Bubbles")
     ax.set_ylabel("Percentage of Users")
     ax.set_xticks(indices)
-    ax.set_xticklabels(clusters.keys())
+    ax.set_xticklabels(bubble.keys())
     ax.legend(title="Keywords", bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
     plt.show()
