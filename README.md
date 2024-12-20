@@ -33,6 +33,7 @@ In this study, we aim to analyze whether users that frequently interact under Ne
 
 --> link to our [website](https://loulams.github.io/ada-website/)
 
+
 ## Research questions
 - Are clusters in our dataset indicative of bubbles with limited perspective diversity ?
 - Do commenters of major news channels form bubbles, or do they behave similarly to random Youtube users ?
@@ -43,43 +44,49 @@ In this study, we aim to analyze whether users that frequently interact under Ne
 To identify the leading news channels on Youtube, we are using the following [article]( https://pressgazette.co.uk/media-audience-and-business-data/media_metrics/youtube-news-publishers-2023-gb-news-piers-morgan-cnn-fox/). We will focus on the TOP 5, excluding Vox (ranked 5th), as it was founded in 2014, which is not well representated in the timeframe of our data (2005-2019).
 
 ## Methods
-In order to answer our questions, we will perform the following analyses. As you can see in results.ipynb, some of them have already been achieved (Part 1 and half of Part 2). 
+In order to answer our questions, the data have been handled in the following way. 
 
-### Part 1: Data handling and filtering
-First, we will need to clean the dataset by removing any irrelevant data, such as NaNs and empty data. Next, we will filter the data to retain only those related to the “News & Politics” category across the several dataframes that we use : df_channels_en.tsv, yt_metadata_en.json, youtube_comments.tsv. Afterwards, we will isolate users who commented on the videos of the 5 largest news channels (see ‘Additional data’), later defined as ‘main channels’ : CNN, ABC News, BBC News, Al Jazeera English, Fox News.
+### Part 0: Data handling and filtering (preprocessing.ipynb)
+As we are dealing with heavy files, we defined readers in `utils.py` that load them chunk by chunk, avoiding memory problems. Videos (yt_metadata_en.json), channels (df_channels_en.tsv) and comments (youtube_comments.tsv) DataFrames were first explored and cleaned by removing irrelevant informations, such as NaNs and empties. We then filtered for those categorized in “News & Politics”, and further kept videos and comments published in our five main channels: CNN, BBC News, ABC News, Al Jazeera English and FOX News (see 'Additional data'). For each main channel, you can find the following plots:
+- total number of subscribers, commenters and comments
+- number of comments per author
+- distribution of comments per author (lin and log scale)
 
-### Part 2: Defining clusters
-Next, we will define and isolate the clusters for analysis. To do so we will determine a threshold for the number of comments per user in order to retain only the most active commenters in each main channel. We will first plot the numbers of comments per user in each main channel to spot outliers. Then a histogram for each main channel will allow us to visualize the distribution of comments per user. Based on this, we will define a threshold for each main channel. Possible methods can be used such as choosing the median, the first or third percentile of the distribution as threshold or define it by visualization on the first set of plots done before. From that, we will create the clusters for each main channel by keeping users whose total number of comments is above the threshold.
+### Part 1: From creation to reaction - understanting Youtube's content dynamics
+Here we analyze the most relevant plots from Part 0, to introduce our research.
 
-### Part 3: Identifying bubbles
-To identify bubbles within the News and Politics community, we will adopt two strategies :
+### Part 2: Uncovering the patterns of the power players of YouTube
+In this section, we define clusters with the most active users of each main channel, i.e. the ones that commented the most. After exploring some cutoff methods, such as the mean, median and percentiles (70th, 80th, 95th, 97th and 99th), we select the users with 99th percentile, meaning the 1%. A Venn Diagram underlines users' overlap of the 5 clusters.
 
+### Part 3: A world of similarities - uncovering shared commenting patterns
 <div align="center">
    <img src="src/figures/bubbles.jpg" alt="Bubbles identification diagram" width="60%">
 </div>
 
-- **Compare the clusters of main channels to random pool of Youtube users** (figure above, top part)\
-We will see if the clusters identified for each main channel represent a bubble, i.e  that they are closer  in the content they comment on than a random sample of Youtube users representing a control sample. This will be achieved by comparing the pairwise overlap values of the videos on which the cluster users have commented, to the one of the control sample. This will help us see if particularly active people in a main channel are more likely to watch/comment on similar content than a random group of Youtube users. If we observe a different behavior between our clusters and the control sample, we can classify our cluster as a bubble.
+- **Compare the clusters of main channels to random pool of Youtube users**, and to each other (figure above, top part)\
+In this section we want to see if the clusters can be identified as bubbles, i.e if the users are close in terms of commented videos. To do that, we compute the pairwise ovelap between two users of the same cluster, and between two users from different clusters. The mean pairwise overlap is expressed in terms of [Jaccard Index](https://en.wikipedia.org/wiki/Jaccard_index) (0 = low similarity, 1 = high similarity), which represents the distance between two users. Values are compared to a random sample of Youtube users.
+
+Median, main, percentiles (70th, 80th, 90th) distribution (lin-log and log-log histograms) of pairwise overlaps for each pair of clusters are shown on 2D tables and heatmaps.
+
 
 - **Examine whether there are bubbles within a cluster** (figure above, bottom part)\
-We will look for the existence of multiple bubbles into the same cluster, which could show us divergence between commenters of the same channel. To do so we will use a flat clustering method such as DBSCAN (from [week 9 course](https://docs.google.com/presentation/d/1OWnmnm8oHRBz1JWymxFBNlClpVLLY9ke/edit#slide=id.p45
-)). Pairwise overlap between the users of the new bubbles will then measure their isolation from one another.
+We also look for the presence of multiple bubbles into the same cluster to uncover divergence between the users. The clustering method used is DBSCAN (from [week 9 course](https://docs.google.com/presentation/d/1OWnmnm8oHRBz1JWymxFBNlClpVLLY9ke/edit#slide=id.p45)) with eps = 0.9 and min_samples = 8, taking cosine distances between users as input values for practical data handling reasons. 
+Pairwise overlap between the users of the new bubbles will then measure their isolation from one another. The bubbles are first shown by PCA and t-SNE projections for FOX cluster, but as they appeared less adequate, network graphs were preferred. 
 
-Network graphs will help us visualize the links between users, showing both their levels of connectivity and isolation. Furthermore, A Venn diagram will complement this by illustrating the size of each bubble as well as their isolation through the extent of users overlap. 
+We then evaluate the closeness and isolation of the generated bubbles with Jaccard Indices as described in the previous step, and show for each channel the Box Plot of mean pairwise overlap of the bubbles. A heatmap shows the mean Jacard indices between each pair of the main (i.e. biggest) bubbles in each cluster.
 
-### Part 4: Analyzing bubbles
-For each identified bubble, we will look at the following properties :
+For the seek of Part 4, we select 3 bubbles per cluster based on the highest mean pairwise overlap and the minimum size of 10 users. Heatmaps of the mean pairwise overlap are shown for the selected bubbles.
 
-- **Define a metric for the bubbles’ isolation**\
-We will assess the degree of isolation, which relies on the overlap in the commented videos between users of both the same and different bubbles. For example, if users within a bubble commented on the same videos, respectively on totally different videos than users of another bubble, the former can be considered as highly isolated. To do so, we will use pairwise overlap calculations again.
+### Part 4: Peering into the bubbles - exploring content and source diversity
+For the 3 bubbles in each channel identified in Part 3, we look at the following properties :
 
-- **Are bubbles formed by the fact that users watch videos from the same channels, or of a same topic within News & Politics ?**\
-To assess this, we will analyze the descriptions of the videos viewed by users within a bubble. We will count how many times each word is employed. Looking at their frequency and relevance we will see if a particular topic can be deduced. Searched topics will remain vast, i.e. political information, daily news, international news, case studies, etc. If common topics are found, we can conclude that the bubble is not only shaped by the users’ sources, but also by shared topic in News & Politics.
+- **Diversification of sources**\
+In this part, we look at the repartition across all the News&Politics channels of the videos commented by the users (all, and >1%) of each cluster, and plot it as Pie Charts. 
 
-- **How closely is a bubble associated with a particular video or channel ?**\
-For each video where a member of the bubble has commented, we will calculate the fraction of comments made by members of the same bubble. This is a measure for the “closeness of the video to the bubble”, which can then be expanded to encompass all videos on a channel, providing the “closeness of the channel to the bubble.”
+- **Content pattern**\
+The last investigation is on the descriptions of all video commented by the users from the bubbles selected in Part 3. We count how many times the leaders Trump, Obama, Cameron,Al Thani and Poutin, as well as the topics climate, education, gender, religion and abortion are employed.
 
-## Proposed timeline 
+## Internal timeline 
 |Timeframe | Tasks | 
 |--------|--------------|
 |Week 10 | <ol><li>Pairwise overlap algorithm</li><li>Bubbles analysis resp. random users</li><li>Degree of isolation</li></ol>| 
@@ -88,10 +95,9 @@ For each video where a member of the bubble has commented, we will calculate the
 |Week 13      |<ol><li>Website development</li><li>Data story refining</li></ol>| 
 |Week 14  | <ol><li>Website refining</li><li>Code and readme cleaning</li></ol>| 
 
-## Internal milestone & team organization
-- **22.11.2024**: week 10 tasks    (Mila, Lou-Anne, Andreas)
+## Milestone & team organization
+- **22.11.2024**: week 10 tasks   (Mila, Lou-Anne, Andreas)
 - **29.11.2024**: week 11 tasks   (Manon, Hortense, Mila)
 - **06.12.2024**: week 12 tasks   (Lou-Anne, Andreas)
 - **13.12.2024**: week 13 tasks   (Manon, Hortense)
 - **20.12.2024**: week 14 tasks   (All)
-
