@@ -31,6 +31,7 @@ Problems can arise when these clusters evolve into bubbles, where users become c
 
 In this study, we aim to analyze whether users that frequently interact under News and politics content of a certain channel form a bubble. After identification of clusters based on commenting behavior in the main media channels, we will assess how isolated they are, focusing on whether they cross over into bubbles.
 
+--> link to our [website](https://loulams.github.io/ada-website/)
 
 ## Research questions
 - Are clusters in our dataset indicative of bubbles with limited perspective diversity ?
