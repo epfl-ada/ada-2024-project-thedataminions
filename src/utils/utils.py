@@ -15,7 +15,7 @@ from sklearn.metrics import jaccard_score
 
 #------------------------------------READERS--------------------------------------------------------
 
-def videos_in_chunks(chunksize: int = 100000, path) -> pd.io.json._json.JsonReader:
+def videos_in_chunks(path,chunksize: int = 100000 ) -> pd.io.json._json.JsonReader:
     """
     Returns a Json reader which can be iterated through, to get chunks of the (unfiltered) video dataset.
 
@@ -30,7 +30,7 @@ def videos_in_chunks(chunksize: int = 100000, path) -> pd.io.json._json.JsonRead
                         #nrows=1000000, )   # uncomment this to only use the first million videos, for testing
                                            # (remove the paranthesis above as well)
 
-def comments_in_chunks(chunksize: int = 1000000, path) -> pd.io.parsers.readers.TextFileReader:
+def comments_in_chunks(path, chunksize: int = 1000000) -> pd.io.parsers.readers.TextFileReader:
     """
     Returns a CSV reader which can be iterated through, to get chunks of the (unfiltered) comment dataset.
 
@@ -46,7 +46,7 @@ def comments_in_chunks(chunksize: int = 1000000, path) -> pd.io.parsers.readers.
                                           # (remove the paranthesis above as well)
 
 
-def videos_in_chunks_clean(chunksize: int = 100000, path) -> pd.io.json._json.JsonReader:
+def videos_in_chunks_clean(path, chunksize: int = 100000) -> pd.io.json._json.JsonReader:
     """
     Returns a Json reader which can be iterated through, to get chunks of the video dataset, with nans etc removed (cleaned).
 
