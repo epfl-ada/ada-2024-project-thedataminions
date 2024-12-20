@@ -15,7 +15,7 @@ from sklearn.metrics import jaccard_score
 
 #------------------------------------READERS--------------------------------------------------------
 
-def videos_in_chunks(chunksize: int = 100000, path) -> pd.io.json._json.JsonReader:
+def videos_in_chunks(path,chunksize: int = 100000 ) -> pd.io.json._json.JsonReader:
     """
     Returns a Json reader which can be iterated through, to get chunks of the (unfiltered) video dataset.
 
@@ -30,7 +30,7 @@ def videos_in_chunks(chunksize: int = 100000, path) -> pd.io.json._json.JsonRead
                         #nrows=1000000, )   # uncomment this to only use the first million videos, for testing
                                            # (remove the paranthesis above as well)
 
-def comments_in_chunks(chunksize: int = 1000000, path) -> pd.io.parsers.readers.TextFileReader:
+def comments_in_chunks(path, chunksize: int = 1000000) -> pd.io.parsers.readers.TextFileReader:
     """
     Returns a CSV reader which can be iterated through, to get chunks of the (unfiltered) comment dataset.
 
@@ -46,7 +46,7 @@ def comments_in_chunks(chunksize: int = 1000000, path) -> pd.io.parsers.readers.
                                           # (remove the paranthesis above as well)
 
 
-def videos_in_chunks_clean(chunksize: int = 100000, path) -> pd.io.json._json.JsonReader:
+def videos_in_chunks_clean(path, chunksize: int = 100000) -> pd.io.json._json.JsonReader:
     """
     Returns a Json reader which can be iterated through, to get chunks of the video dataset, with nans etc removed (cleaned).
 
@@ -2528,18 +2528,7 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
     #dict to store the percentage of users for each keyword
     percentages = {keyword: [] for keyword in keywords}
     number_vid = {keyword: [] for keyword in keywords}
-    #dict to store number of video for each keyword
-    all_number_vid = {keyword: [] for keyword in keywords}
     
-    #plot bar plot for each word of interest (keywords)
-    def plot_bar_chart(sizes, labels, word):
-        fig, ax = plt.subplots()
-        ax.bar(labels, sizes)
-        plt.title(f'Repartition of videos with title containing "{word}" depending on channel')
-        plt.xlabel('Channels')
-        plt.ylabel('Number of Videos')
-        plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
-        plt.show()
         
     #iterating over the key word
     for word_of_interest in keywords:
@@ -2560,12 +2549,12 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
 
     # Create a bar for each keyword - want all the bar on a single plot
     for i, word in enumerate(keywords):
-        ax.bar([pos + i * bar_width for pos in index], number_vid[word], bar_width, label=word)
+        ax.bar([pos + i * (bar_width + 0.1)  for pos in index], number_vid[word], bar_width, label=word)
 
     ax.set_title("Number of videos depending on the title")
     ax.set_xlabel("Channels")
     ax.set_ylabel("Number of videos")
-    ax.set_xticks([pos + bar_width for pos in index])  
+    ax.set_xticks([pos + (bar_width + 0.1) * (len(keywords) - 1) / 2 for pos in index]) 
     ax.set_xticklabels(clusters.keys()) 
     ax.legend(title="Keywords")
 
@@ -2579,12 +2568,12 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
 
     # Create a bar for each keyword - want all the bar on a single plot
     for i, word in enumerate(keywords):
-        ax.bar([pos + i * bar_width for pos in index], percentages[word], bar_width, label=word)
+        ax.bar([pos + i * (bar_width + 0.5)  for pos in index], percentages[word], bar_width, label=word)
 
     ax.set_title("Interest in Keywords Across Channels")
     ax.set_xlabel("Channels")
     ax.set_ylabel("Percentage of Users")
-    ax.set_xticks([pos + bar_width for pos in index])  
+    ax.set_xticks([pos + (bar_width + 0.5) * (len(keywords) - 1) / 2 for pos in index])  
     ax.set_xticklabels(clusters.keys()) 
     ax.legend(title="Keywords")
 
