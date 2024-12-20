@@ -93,3 +93,4 @@ For each video where a member of the bubble has commented, we will calculate the
 - **06.12.2024**: week 12 tasks   (Lou-Anne, Andreas)
 - **13.12.2024**: week 13 tasks   (Manon, Hortense)
 - **20.12.2024**: week 14 tasks   (All)
+
