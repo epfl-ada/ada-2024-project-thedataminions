@@ -1180,7 +1180,7 @@ def remove_entries_for_duplicate_user_pairs(matrix: scipy.sparse.csc_matrix | np
                     matrix[i, j] = np.nan
                 else:
                     matrix[i, j] = 0
-    print(f"{removed_entries} overlapping users found and set to 0 or np.nan.")
+    # print(f"{removed_entries} overlapping users found and set to 0 or np.nan.")
 
     if isinstance(matrix, scipy.sparse.csc_matrix):
         matrix.eliminate_zeros()
@@ -1266,8 +1266,8 @@ def get_c_false_true_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # full of ones)
 
     matrix_T_times_ones = video_user_matrix.T.sum(axis=1, dtype=np.int16)  # Corresponds to X^T * 1
-    print(f"Dtype of matrix_T_times_ones is {matrix_T_times_ones.dtype}")
-    print(f"It looks like this:\n{matrix_T_times_ones}")
+    # print(f"Dtype of matrix_T_times_ones is {matrix_T_times_ones.dtype}")
+    # print(f"It looks like this:\n{matrix_T_times_ones}")
 
     if video_user_matrix_2 is None:
         
@@ -1380,11 +1380,11 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # get C_tt matrix
     if sparse:
         c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2)
-        print("C_tt is a sparse matrix like this:")
-        print(c_tt)
+        # print("C_tt is a sparse matrix like this:")
+        # print(c_tt)
     else:
         c_tt = get_c_true_true(video_user_matrix, video_user_matrix_2).toarray()
-    print("c_tt calculated")
+    # print("c_tt calculated")
 
     if sparse:
         c_tt_non_zero = c_tt.astype(bool).toarray()
@@ -1410,7 +1410,7 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
         denominator = c_tt + get_c_true_false_matrix(video_user_matrix, video_user_matrix_2, where=c_tt_non_zero)
     else:
         denominator = c_tt + get_c_true_false_matrix(video_user_matrix, video_user_matrix_2)#, where=c_tt_non_zero)
-    print("c_tf calculated")
+    # print("c_tf calculated")
 
     # get C_ft matrix
 
@@ -1431,12 +1431,12 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # print(c_tf)
     # print(c_ft)
     # denominator = c_tt + c_tf + c_ft
-    print("Calculated c_ft, and summing nominator done. Looks like this:")
-    print(denominator)
-    print("And has this shape")
-    print(denominator.shape)
-    print("The numeraor will have this shape:")
-    print(c_tt.shape)
+    # print("Calculated c_ft, and summing nominator done. Looks like this:")
+    # print(denominator)
+    # print("And has this shape")
+    # print(denominator.shape)
+    # print("The numeraor will have this shape:")
+    # print(c_tt.shape)
     # print("This is where the true values of the numerator are:")
     # print(c_tt.astype(bool))
     # denominator = np.multiply(denominator,c_tt.astype(bool).astype(np.int32).toarray())#np.multiply(denominator, c_tt.astype(bool))
@@ -1446,12 +1446,12 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
     # print("Converting denominator to sparse done, looks like this:")
     # print(denominator)
     # numerator = c_tt#.astype(np.float32)
-    print("This is the numerator:")
-    print(c_tt)
+    # print("This is the numerator:")
+    # print(c_tt)
     # del c_tt
     # del c_tf
     # del c_ft
-    print("Got all the matrices. Starting division....")
+    # print("Got all the matrices. Starting division....")
     if precision == 32:
         result = np.zeros(c_tt.shape, dtype=np.float32)
     elif precision == 16:
@@ -1468,8 +1468,8 @@ def get_jaccard_index_matrix(video_user_matrix: scipy.sparse.csc_matrix,
                 #where=c_tt_non_zero,
                 out=result)
         
-    print("Division done. Result is:")
-    print(result)
+    # print("Division done. Result is:")
+    # print(result)
     return result
 
 
@@ -1689,18 +1689,18 @@ def get_jacc_between_two_clusters_and_get_mean(matrix_1: scipy.sparse.csc_matrix
         np.save(filename, jaccard_with_duplicates)
     
     # Remove all entries of the jaccard matrix where the row and column correspond to the same user
-    print("    Removing entries corresponding to pairs of the same user....")
+    # print("    Removing entries corresponding to pairs of the same user....")
     jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
         jaccard_with_duplicates, 
         users_to_consider_1,
         users_to_consider_2)
     del jaccard_with_duplicates
-    print("    Done.")
+    # print("    Done.")
     # calculate the mean of the jaccard indices, excluding the diagonal
-    print("    Calculating the mean of the jaccard index matrix....")
+    # print("    Calculating the mean of the jaccard index matrix....")
     mean_jaccard = jaccard_without_duplicates.sum(axis=None) / (jaccard_without_duplicates.size 
                                                                 - removed_entries)
-    print("    Done.")
+    # print("    Done.")
     del jaccard_without_duplicates
     gc.collect()
     return mean_jaccard
@@ -1763,7 +1763,7 @@ def get_jacc_between_two_clusters_and_get_percentile(matrix_1: scipy.sparse.csc_
         np.save(filename, jaccard_with_duplicates)
     
     # Remove all entries of the jaccard matrix where the row and column correspond to the same user
-    print("    Removing entries corresponding to pairs of the same user....")
+    # print("    Removing entries corresponding to pairs of the same user....")
     jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
         jaccard_with_duplicates, 
         users_to_consider_1,
@@ -1771,7 +1771,7 @@ def get_jacc_between_two_clusters_and_get_percentile(matrix_1: scipy.sparse.csc_
         nan_instead=True)
     
     del jaccard_with_duplicates
-    print("    Done.")
+    # print("    Done.")
     # calculate the percentile of the jaccard indices, excluding the diagonal
     print("    Calculating the percentile of the jaccard index matrix....")
     percentile_jaccard = np.nanpercentile(jaccard_without_duplicates, percentile)
@@ -2065,9 +2065,9 @@ def plot_histograms_of_jaccard_indices_from_matrix_to_ax(
         raise ValueError("At least one axis must be given.")
     
     print("Jaccard index matrix loaded.")
-    print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
+    # print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
     jaccard_index_matrix = jaccard_index_matrix.astype(np.float16)
-    print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
+    # print(f"Jaccard dtype is {jaccard_index_matrix.dtype}")
     if cluster_name_2 is None or cluster_name_2 == cluster_name_1:
         
         for i in range(jaccard_index_matrix.shape[0]):
@@ -2362,13 +2362,13 @@ def get_jacc_mean_between_two_clusters(matrix_1: scipy.sparse.csc_matrix,
 
     
     # Remove all entries of the jaccard matrix where the row and column correspond to the same user
-    print("Removing entries corresponding to pairs of the same user....")
+    # print("Removing entries corresponding to pairs of the same user....")
     jaccard_without_duplicates, removed_entries = remove_entries_for_duplicate_user_pairs(
         jaccard_with_duplicates, 
         users_to_consider_1,
         users_to_consider_2)
     del jaccard_with_duplicates
-    print("Done.")
+    # print("Done.")
     # calculate the mean of the jaccard indices, excluding the diagonal
     print("Calculating the mean of the jaccard index matrix....")
     mean_jaccard = jaccard_without_duplicates.sum(axis=None) / (jaccard_without_duplicates.size 
