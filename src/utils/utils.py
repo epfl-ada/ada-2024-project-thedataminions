@@ -12,6 +12,57 @@ from matplotlib import colormaps
 import seaborn as sns
 from sklearn.metrics import jaccard_score
 
+
+#------------------------------------READERS--------------------------------------------------------
+
+def videos_in_chunks(chunksize: int = 100000, path) -> pd.io.json._json.JsonReader:
+    """
+    Returns a Json reader which can be iterated through, to get chunks of the (unfiltered) video dataset.
+
+    Args:
+        chunksize: number of entries in each chunk
+
+    Returns:
+        the Json reader
+    """
+    return pd.read_json(path + "yt_metadata_en.jsonl.gz", 
+                        compression="infer", lines=True, chunksize=chunksize,)
+                        #nrows=1000000, )   # uncomment this to only use the first million videos, for testing
+                                           # (remove the paranthesis above as well)
+
+def comments_in_chunks(chunksize: int = 1000000, path) -> pd.io.parsers.readers.TextFileReader:
+    """
+    Returns a CSV reader which can be iterated through, to get chunks of the (unfiltered) comment dataset.
+
+    Args:
+        chunksize: number of entries in each chunk
+
+    Returns:
+        the CSV reader
+    """
+    return pd.read_csv(path + "youtube_comments.tsv.gz", 
+                       compression="infer", sep="\t", chunksize=chunksize, )
+                       #nrows = 10000000)  # uncomment this to only use the first 10 million comments, for testing
+                                          # (remove the paranthesis above as well)
+
+
+def videos_in_chunks_clean(chunksize: int = 100000, path) -> pd.io.json._json.JsonReader:
+    """
+    Returns a Json reader which can be iterated through, to get chunks of the video dataset, with nans etc removed (cleaned).
+
+    Args:
+        chunksize: number of entries in each chunk
+
+    Returns:
+        the Json reader
+    """
+    return pd.read_csv(path,
+                       compression="infer", chunksize=chunksize, )
+                        #nrows=1000000, )   # uncomment this to only use the first million videos, for testing
+                                          # (remove the paranthesis above as well)
+
+#--------------------------------------------------------------------------------------------------------- 
+
 def run_simple_function_on_chunks_concat(reader, fct, print_time: bool | Tuple = False, 
                                          save: Optional[str] = None, 
                                          save_every: Optional[int] = None,
