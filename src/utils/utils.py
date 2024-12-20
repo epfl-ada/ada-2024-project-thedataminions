@@ -1,5 +1,6 @@
 """Functions for processing (big) datasets. Will be called from the notebook"""
 import time
+import networkx as nx
 import pandas as pd
 from typing import Tuple, Optional, Dict, List, Callable
 import gc
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colormaps
 import seaborn as sns
 from sklearn.metrics import jaccard_score
+from matplotlib.lines import Line2D
 
 
 #------------------------------------READERS--------------------------------------------------------
@@ -2489,8 +2491,8 @@ def network_graph_bubbles(dictionnary_distance_matrices:dict, dictionnary_bubble
             None
     """
     for key in dictionnary_distance_matrices :
-        distance_matrix = distance_matrices[key]
-        bubbles = ["outliers" if bubble == -1 else bubble for bubble in labels_dict[key]] #the outlier bubble is identified as -1 in the DBSCAN results, change the name -1 for outliers
+        distance_matrix = dictionnary_distance_matrices[key]
+        bubbles = ["outliers" if bubble == -1 else bubble for bubble in dictionnary_bubbles_labels[key]] #the outlier bubble is identified as -1 in the DBSCAN results, change the name -1 for outliers
 
         #Combine tab20 and tab20b color pallets for up to 27 distinct colors since we have maximum 26 different bubbles + outliers  
         colors_tab20 = plt.cm.tab20(np.linspace(0, 1, 20))
@@ -2555,8 +2557,8 @@ def network_graph_bubbles_without_outliers(dictionnary_distance_matrices:dict, d
             None
     """
     for key in dictionnary_distance_matrices :
-        distance_matrix = distance_matrices[key]
-        bubbles = ["outliers" if bubble == -1 else bubble for bubble in labels_dict[key]] #the outlier bubble is identified as -1 in the DBSCAN results, change the name -1 for outliers
+        distance_matrix = dictionnary_distance_matrices[key]
+        bubbles = ["outliers" if bubble == -1 else bubble for bubble in dictionnary_bubbles_labels[key]] #the outlier bubble is identified as -1 in the DBSCAN results, change the name -1 for outliers
 
         #Combine tab20 and tab20b color pallets for up to 27 distinct colors since we have maximum 26 different bubbles + outliers  
         colors_tab20 = plt.cm.tab20(np.linspace(0, 1, 20))
