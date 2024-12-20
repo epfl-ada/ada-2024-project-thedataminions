@@ -22,7 +22,8 @@ pip install -r pip_requirements.txt
 - `.gitignore`: Specifies files and folders to ignore.
 - `README.md`: Main documentation file of the repository, providing an overview and general instructions.
 - `pip_requirements.txt`: List of packages required for our code.
-- `results.ipynb`: Main work for Milestone 2.
+- `results.ipynb`: Main results discussed in the Data Story
+- `preprocessing.ipynb`: Data cleaning 
 
 ## Abstract
 The common advice suggests that to stay well-informed, one should diversify its sources. We can define clusters of youtube users, which formed by particularly active people within a channel. These clusters reflect communities invested into the same channel but don't yet imply that they don’t diversify their sources to retrieve information on a particular topic.
