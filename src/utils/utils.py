@@ -2522,7 +2522,7 @@ def process_word_interest(cluster_matrix, percentage_func, videos_mapping, word,
     return filtered_df, number_colum, total_number_user, percentage_total, number_of_videos
 
 
-
+'''
 def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
     """Processes word interest and generates pie charts and trends for given keywords."""
     #dict to store the percentage of users for each keyword
@@ -2549,12 +2549,12 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
 
     # Create a bar for each keyword - want all the bar on a single plot
     for i, word in enumerate(keywords):
-        ax.bar([pos + i * (bar_width + 0.1)  for pos in index], number_vid[word], bar_width, label=word)
+        ax.bar([pos +  (bar_width )  for pos in index], number_vid[word], bar_width, label=word)
 
     ax.set_title("Number of videos depending on the title")
     ax.set_xlabel("Channels")
     ax.set_ylabel("Number of videos")
-    ax.set_xticks([pos + (bar_width + 0.1) * (len(keywords) - 1) / 2 for pos in index]) 
+    ax.set_xticks([pos + i*(bar_width ) for pos in index]) 
     ax.set_xticklabels(clusters.keys()) 
     ax.legend(title="Keywords")
 
@@ -2568,13 +2568,71 @@ def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
 
     # Create a bar for each keyword - want all the bar on a single plot
     for i, word in enumerate(keywords):
-        ax.bar([pos + i * (bar_width + 0.5)  for pos in index], percentages[word], bar_width, label=word)
+        ax.bar([pos +  i*(bar_width)  for pos in index], percentages[word], bar_width, label=word)
 
     ax.set_title("Interest in Keywords Across Channels")
     ax.set_xlabel("Channels")
     ax.set_ylabel("Percentage of Users")
-    ax.set_xticks([pos + (bar_width + 0.5) * (len(keywords) - 1) / 2 for pos in index])  
+    ax.set_xticks([pos + (bar_width)  for pos in index])  
     ax.set_xticklabels(clusters.keys()) 
     ax.legend(title="Keywords")
 
+    plt.show()
+'''
+def process_and_plot_word_interest(clusters, videos_news_pol, map, keywords):
+    """Processes word interest and generates pie charts and trends for given keywords."""
+    # dict to store the percentage of users for each keyword
+    percentages = {keyword: [] for keyword in keywords}
+    number_vid = {keyword: [] for keyword in keywords}
+    
+    # iterating over the keywords
+    for word_of_interest in keywords:
+        # iterating over the clusters (cnn, bbc, abc, aje, fox)
+        for cluster_name, cluster_matrix in clusters.items():
+            filtered_df, _, _, percentage_total, number_of_videos = process_word_interest(
+                cluster_matrix, percentage_users, videos_news_pol, word_of_interest, map
+            )
+            percentages[word_of_interest].append(percentage_total)
+            number_vid[word_of_interest].append(number_of_videos)
+            
+    # Plot bar chart for number of videos
+    fig, ax = plt.subplots(figsize=(12, 6))
+    bar_width = 0.15  # Reduced width to fit bars closer together
+    num_channels = len(clusters)
+    num_keywords = len(keywords)
+     
+    # Calculate the starting position for each group of bars
+    indices = np.arange(num_channels)
+    
+    # Create bars for each keyword
+    for i, word in enumerate(keywords):
+        # Calculate offset to center the group of bars
+        offset = bar_width * (i - (num_keywords - 1)/2)
+        ax.bar(indices + offset, number_vid[word], bar_width, label=word)
+
+    ax.set_title("Number of Videos by Bubble and Keyword")
+    ax.set_xlabel("Bubbles")
+    ax.set_ylabel("Number of Videos")
+    ax.set_xticks(indices)
+    ax.set_xticklabels(clusters.keys())
+    ax.legend(title="Keywords", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+    
+    # Plot bar chart for percentages
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Create bars for each keyword
+    for i, word in enumerate(keywords):
+        # Calculate offset to center the group of bars
+        offset = bar_width * (i - (num_keywords - 1)/2)
+        ax.bar(indices + offset, percentages[word], bar_width, label=word)
+
+    ax.set_title("Interest in Keywords Across Bubbles")
+    ax.set_xlabel("Bubbles")
+    ax.set_ylabel("Percentage of Users")
+    ax.set_xticks(indices)
+    ax.set_xticklabels(clusters.keys())
+    ax.legend(title="Keywords", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
     plt.show()
